@@ -63,7 +63,7 @@ where
     vec.push(newp);
     return vec;
 }
-
+//创建根据链上数据和自己的随机数创造一组数据
 pub fn mpc_common_paramters_custom<E>(
     paramter_last: &ParameterPair<E>,
     my_alpha: E::Fr,
@@ -89,7 +89,7 @@ where
     };
     return Ok(result);
 }
-
+//造个假数据，测试用
 pub fn mpc_bad_paramters_custom<E>(
     paramter_last: &ParameterPair<E>,
     my_alpha: E::Fr,
@@ -115,33 +115,41 @@ where
     };
     return Ok(result);
 }
-
+//用目前链上的数据和我们新建的数据验证一下
 pub fn verify_mpc_g1<E>(new_paramter: &ParameterPair<E>, paramters: &Vec<ParameterPair<E>>) -> bool
 where
     E: Engine,
     E::G1: WnafGroup,
     E::G2: WnafGroup,
 {
+    /**
+  	*这一步验证传来的结构体里g1,g2上的点是一一对应而非假造的，验证方法为：
+		* pairing(g1_mine, g2)== E::pairing(g1, g2_mine);
+		* pairing(g1_result, g2)== E::pairing(g1, g2_result);
+  	*/
     let g1 = E::G1::generator();
     let g2 = E::G2::generator();
     let mut result = E::pairing(&new_paramter.g1_mine.unwrap(), &g2.to_affine())
         == E::pairing(&g1.to_affine(), &new_paramter.g2_mine.unwrap());
+      	result = E::pairing(&new_paramter.g1_result.unwrap(), &g2.to_affine())
+        == E::pairing(&g1.to_affine(), &new_paramter.g2_result.unwrap());
     let index = paramters.len();
 
+    /**
+		* 这一步用来验证第i个节点是否篡改了原来的数据：拿出一个进故宫验证的节点i-1的数据list[i-1]
+		* 那么应该有：pairing(list[i-1].g1_result,new_paramter.g2_mine)==pairing(new_paramter.g1_result,g2)
+		*/
     if (index >= 1) {
         let paramter_last = new_paramter.g1_result.unwrap();
         let paramter_part2 = new_paramter.g2_mine.unwrap();
         let paramter_part1 = paramters[index - 1].g1_result.unwrap();
-        /*let paramter_last = paramters[index - 1].g1_result.unwrap();
-        let paramter_part2 = paramters[index - 1].g2_mine.unwrap();
-        let paramter_part1 = paramters[index - 2].g1_result.unwrap();*/
         result = result
             && E::pairing(&paramter_last, &g2.to_affine())
                 == E::pairing(&paramter_part1, &paramter_part2);
     }
     result
 }
-
+//x的参数，就是x0,x,x^2...的Vec
 #[derive(Clone)]
 pub struct TauParameterPair<E: Engine> {
     pub list: Vec<ParameterPair<E>>,
@@ -166,6 +174,7 @@ where
     return [TauParameterPair { list: result }].to_vec();
 }
 
+//创造一个x的数据，就是x0,x,x^2...的Vec
 pub fn mpc_common_tauparamters_custom<E>(
     tauparamter_last: &TauParameterPair<E>,
     my_x: Vec<E::Fr>,
@@ -200,6 +209,7 @@ where
     return Ok(TauParameterPair { list: result_list });
 }
 
+//链上执行添加数据的操作
 pub fn TauParamterListExcute<E: Engine>(
     mut vec: Vec<TauParameterPair<E>>,
     p: TauParameterPair<E>,
@@ -236,7 +246,7 @@ where
     vec.push(x_vec);
     return vec;*/
 }
-
+//验证 x^n-1 *x = x^n
 pub fn verify_x_pow<E>(new_xparamter: &TauParameterPair<E>) -> bool
 where
     E: Engine,
@@ -258,6 +268,10 @@ where
     return result;
 }
 
+
+
+
+//一个横向验证verify_mpc_g1用来确认它是否使用了脸上的数据，一个纵向验证verify_x_pow验证它这一串到底是不是指数排列的
 pub fn verify_mpc_x<E>(
     new_xparamter: &TauParameterPair<E>,
     paramters: &Vec<TauParameterPair<E>>,
