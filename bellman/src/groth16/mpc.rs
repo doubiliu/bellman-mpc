@@ -128,10 +128,13 @@ where
         == E::pairing(&g1.to_affine(), &new_paramter.g2_mine.unwrap());
     let index = paramters.len();
 
-    if (index > 1) {
-        let paramter_last = paramters[index - 1].g1_result.unwrap();
+    if (index >= 1) {
+        let paramter_last = new_paramter.g1_result.unwrap();
+        let paramter_part2 = new_paramter.g2_mine.unwrap();
+        let paramter_part1 = paramters[index - 1].g1_result.unwrap();
+        /*let paramter_last = paramters[index - 1].g1_result.unwrap();
         let paramter_part2 = paramters[index - 1].g2_mine.unwrap();
-        let paramter_part1 = paramters[index - 2].g1_result.unwrap();
+        let paramter_part1 = paramters[index - 2].g1_result.unwrap();*/
         result = result
             && E::pairing(&paramter_last, &g2.to_affine())
                 == E::pairing(&paramter_part1, &paramter_part2);
