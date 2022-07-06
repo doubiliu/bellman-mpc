@@ -16,6 +16,7 @@ use std::sync::Arc;
 mod tests;
 
 mod generator;
+pub mod generator_val;
 pub mod mpc;
 mod prover;
 mod verifier;

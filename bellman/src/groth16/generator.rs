@@ -31,17 +31,17 @@ where
 {
     let g1 = E::G1::generator();
     let g2 = E::G2::generator();
-    let alpha = E::Fr::from(48577);
-    let beta = E::Fr::from(22580);
-    let gamma = E::Fr::from(53332);
-    let delta = E::Fr::from(5481);
-    let tau = E::Fr::from(3673);
+    let alpha = E::Fr::from(2);
+    let beta = E::Fr::from(3);
+    let gamma = E::Fr::from(4);
+    let delta = E::Fr::from(1);
+    let tau = E::Fr::from(2);
     generate_parameters::<E, C>(circuit, g1, g2, alpha, beta, gamma, delta, tau)
 }
 
 /// This is our assembly structure that we'll use to synthesize the
 /// circuit into a QAP.
-struct KeypairAssembly<Scalar: PrimeField> {
+pub struct KeypairAssembly<Scalar: PrimeField> {
     num_inputs: usize,
     num_aux: usize,
     num_constraints: usize,
@@ -155,16 +155,16 @@ impl<Scalar: PrimeField> ConstraintSystem<Scalar> for KeypairAssembly<Scalar> {
     }
 }
 
-/*#[allow(clippy::too_many_arguments)]
-pub fn generate_parameters<E, C>(
+use crate::groth16::generator_val::{matrix_mul_tau, tau_list_add};
+use crate::groth16::mpc::{
+    mpc_common_paramters_custom_all, mpc_uncommon_paramters_custom_all, CommonParamter,
+    UnCommonParamter,
+};
+#[allow(clippy::too_many_arguments)]
+pub fn generate_parameters_mpc<E, C>(
     circuit: C,
     g1: E::G1,
     g2: E::G2,
-    alpha: E::Fr,
-    beta: E::Fr,
-    gamma: E::Fr,
-    delta: E::Fr,
-    tau: E::Fr,
 ) -> Result<Parameters<E>, SynthesisError>
 where
     E: Engine,
@@ -172,17 +172,63 @@ where
     E::G2: WnafGroup,
     C: Circuit<E::Fr>,
 {
+    let mut assembly = KeypairAssembly {
+        num_inputs: 0,
+        num_aux: 0,
+        num_constraints: 0,
+        at_inputs: vec![],
+        bt_inputs: vec![],
+        ct_inputs: vec![],
+        at_aux: vec![],
+        bt_aux: vec![],
+        ct_aux: vec![],
+    };
 
+    // Allocate the "one" input variable
+    assembly.alloc_input(|| "", || Ok(E::Fr::one()))?;
 
+    circuit.synthesize(&mut assembly)?;
+    for i in 0..assembly.num_inputs {
+        assembly.enforce(|| "", |lc| lc + Variable(Index::Input(i)), |lc| lc, |lc| lc);
+    }
+    let mut a = vec![E::G1Affine::identity(); assembly.num_inputs + assembly.num_aux];
+    let mut b_g1 = vec![E::G1Affine::identity(); assembly.num_inputs + assembly.num_aux];
+    let mut b_g2 = vec![E::G2Affine::identity(); assembly.num_inputs + assembly.num_aux];
 
-
-
-
-
-
-
-
-}*/
+    let cp = mpc_common_paramters_custom_all::<E>();
+    let cp_m = cp.matrix(&assembly.at_aux, &assembly.bt_aux, &assembly.ct_aux);
+    let ucp = mpc_uncommon_paramters_custom_all::<E>(&cp_m);
+    let vk = VerifyingKey::<E> {
+        alpha_g1: cp.alpha.g1_result.unwrap(),
+        beta_g1: cp.beta.g1_result.unwrap(),
+        beta_g2: cp.beta.g2_result.unwrap(),
+        gamma_g2: ucp.gamma.g2_result.unwrap(),
+        delta_g1: ucp.delta.g1_result.unwrap(),
+        delta_g2: ucp.delta.g2_result.unwrap(),
+        ic: ucp.ic.get_g1(),
+    };
+    Ok(Parameters {
+        vk,
+        h: Arc::new(ucp.h.get_g1()),
+        l: Arc::new(ucp.l.get_g1()),
+        // Filter points at infinity away from A/B queries
+        a: Arc::new(
+            a.into_iter()
+                .filter(|e| bool::from(!e.is_identity()))
+                .collect(),
+        ),
+        b_g1: Arc::new(
+            b_g1.into_iter()
+                .filter(|e| bool::from(!e.is_identity()))
+                .collect(),
+        ),
+        b_g2: Arc::new(
+            b_g2.into_iter()
+                .filter(|e| bool::from(!e.is_identity()))
+                .collect(),
+        ),
+    })
+}
 
 /// Create parameters for a circuit, given some toxic waste.
 #[allow(clippy::too_many_arguments)]
@@ -230,6 +276,9 @@ where
     let powers_of_tau = vec![Scalar::<E::Fr>(E::Fr::zero()); assembly.num_constraints];
     let mut powers_of_tau = EvaluationDomain::from_coeffs(powers_of_tau)?;
 
+    println!("at_aux: {:?}", assembly.at_aux);
+    println!("bt_aux: {:?}", assembly.bt_aux);
+    println!("ct_aux: {:?}", assembly.ct_aux);
     // Compute G1 window table
     let mut g1_wnaf = Wnaf::new();
     let g1_wnaf = g1_wnaf.base(g1, {
@@ -530,4 +579,3 @@ where
         ),
     })
 }
-

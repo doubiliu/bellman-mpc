@@ -14,7 +14,9 @@ use bls12_381::{Bls12, Scalar};
 use crate::and_mod::{AndDemo, RangeDemo};
 use crate::groth16::mpc::{
     initParameterList, initTauParameterList, mpc_bad_paramters_custom, mpc_common_paramters_custom,
-    mpc_common_tauparamters_custom, ParameterPair, ParamterListExcute, TauParamterListExcute,
+    mpc_common_paramters_custom_generator, mpc_common_tauparamters_custom,
+    mpc_common_tauparamters_custom_generator, ParameterPair, ParamterListExcute,
+    TauParamterListExcute,
 };
 use crate::groth16::{
     batch, create_proof, create_random_proof, generate_parameters, generate_random_parameters,
@@ -181,15 +183,15 @@ pub fn test_mpc_alpha() {
     //链上：初始化参数列表，一个g1
     let mut list = initParameterList::<Bls12>();
     //链下：player1计算
-    let player1_param = mpc_common_paramters_custom::<Bls12>(&list[0], player1);
+    let player1_param = mpc_common_paramters_custom_generator::<Bls12>(&list[0], player1);
     //链上：验证player1，成功则添加
     list = ParamterListExcute::<Bls12>(list, player1_param.unwrap());
     //链下：player1计算
-    let player2_param = mpc_common_paramters_custom::<Bls12>(&list[1], player2);
+    let player2_param = mpc_common_paramters_custom_generator::<Bls12>(&list[1], player2);
     //链上：验证player2，成功则添加
     list = ParamterListExcute::<Bls12>(list, player2_param.unwrap());
     //链下：player3计算
-    let player3_param = mpc_common_paramters_custom::<Bls12>(&list[2], player3);
+    let player3_param = mpc_common_paramters_custom_generator::<Bls12>(&list[2], player3);
     //捣乱的
     //let badman3_params = mpc_bad_paramters_custom::<Bls12>(&list[2], player3);
     //链上：验证player3，成功则添加
@@ -212,7 +214,7 @@ pub fn test_mpc_tau() {
     //链上：初始化参数列表
     let mut list = initTauParameterList::<Bls12>(player1.len());
 
-    let player0_param = mpc_common_tauparamters_custom::<Bls12>(&list[0], player0);
+    let player0_param = mpc_common_tauparamters_custom_generator::<Bls12>(&list[0], player0);
 
     println!("player0 create custom done");
     //链上：验证player1，成功则添加
@@ -220,19 +222,19 @@ pub fn test_mpc_tau() {
     println!("player0 verify done");
 
     //链下：player1计算
-    let player1_param = mpc_common_tauparamters_custom::<Bls12>(&list[1], player1);
+    let player1_param = mpc_common_tauparamters_custom_generator::<Bls12>(&list[1], player1);
     println!("player1 create custom done");
     //链上：验证player1，成功则添加
     list = TauParamterListExcute::<Bls12>(list, player1_param.unwrap());
     println!("player1 verify done");
     //链下：player1计算
-    let player2_param = mpc_common_tauparamters_custom::<Bls12>(&list[2], player2);
+    let player2_param = mpc_common_tauparamters_custom_generator::<Bls12>(&list[2], player2);
     println!("player2 create custom done");
     //链上：验证player2，成功则添加
     list = TauParamterListExcute::<Bls12>(list, player2_param.unwrap());
     println!("player2 verify done");
     //链下：player3计算
-    let player3_param = mpc_common_tauparamters_custom::<Bls12>(&list[3], player3);
+    let player3_param = mpc_common_tauparamters_custom_generator::<Bls12>(&list[3], player3);
     println!("player3 create custom done");
     //捣乱的
     //let badman3_params = mpc_bad_paramters_custom::<Bls12>(&list[2], player3);
