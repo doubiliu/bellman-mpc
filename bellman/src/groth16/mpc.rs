@@ -27,6 +27,9 @@ impl<E: Engine> ParameterPair<E> {
     fn get_g1(&self) -> E::G1Affine {
         self.g1_result.unwrap()
     }
+    fn get_g2(&self) -> E::G2Affine {
+        self.g2_result.unwrap()
+    }
 }
 
 pub fn initParameterList<E>() -> Vec<ParameterPair<E>>
@@ -179,6 +182,13 @@ impl<E: Engine> TauParameterPair<E> {
         }
         result
     }
+    pub fn get_g2(&self) -> Vec<E::G2Affine> {
+        let mut result = Vec::new();
+        for i in 0..self.list.len() {
+            result.push(self.list[i].get_g2())
+        }
+        result
+    }
 }
 
 pub fn initTauParameterList<E>(n: usize) -> Vec<TauParameterPair<E>>
@@ -320,6 +330,31 @@ pub struct CommonParamter<E: Engine> {
 }
 
 impl<E: Engine> CommonParamter<E> {
+    pub fn to_storage_format(&self) -> CommonParamterInStorage<E> {
+        CommonParamterInStorage {
+            alpha_g1: self.alpha.get_g1(),
+            beta_g1: self.beta.get_g1(),
+            beta_g2: self.beta.get_g2(),
+            tau_g1: self.tau.get_g1(),
+            tau_g2: self.tau.get_g2(),
+            alpha_mul_tau: self.alpha_mul_tau.get_g1(),
+            beta_mul_tau: self.beta_mul_tau.get_g1(),
+        }
+    }
+}
+
+#[derive(Debug, Clone)]
+pub struct CommonParamterInStorage<E: Engine> {
+    pub alpha_g1: E::G1Affine,
+    pub beta_g1: E::G1Affine,
+    pub beta_g2: E::G2Affine,
+    pub tau_g1: Vec<E::G1Affine>,
+    pub tau_g2: Vec<E::G2Affine>,
+    pub alpha_mul_tau: Vec<E::G1Affine>,
+    pub beta_mul_tau: Vec<E::G1Affine>,
+}
+
+impl<E: Engine> CommonParamterInStorage<E> {
     pub fn matrix(
         &self,
         at_aux: &Vec<Vec<(E::Fr, usize)>>,
@@ -331,28 +366,72 @@ impl<E: Engine> CommonParamter<E> {
     }
 }
 
-pub fn mpc_common_paramters_custom_all<E>() -> CommonParamter<E>
+use std::collections::HashMap;
+pub struct CommonParamtersMap<E: Engine> {
+    len: i32,
+    map: HashMap<i32, CommonParamterInStorage<E>>,
+}
+
+impl<E: Engine> CommonParamtersMap<E> {
+    pub fn get_last(&self) -> CommonParamterInStorage<E> {
+        let last_index = self.len;
+        self.map[&last_index].clone()
+    }
+}
+
+pub fn initial_common_paramters<E>() -> CommonParamtersMap<E>
 where
     E: Engine,
     E::G1: WnafGroup,
     E::G2: WnafGroup,
 {
-    //下边每一次生成的时候单独验证，但是有耦合的地方
-    //eg:alpha_mul_tau 与 alpha
-    //时候也应该考虑验证吧
-    /*let alpha = generator_val();
-    let beta = generator_val();
-    let tau = generator_tau();
-    let alpha_mul_tau = generator_tau_from(&alpha);
-    let beta_mul_tau = generator_tau_from(&beta);
-    CommonParamter {
-        alpha,
-        beta,
-        tau,
-        alpha_mul_tau,
-        beta_mul_tau,
-    }*/
+    let len = 0;
+    let init_paramters = 0;
     unimplemented!()
+}
+
+pub fn mpc_common_paramters_generatoer<E>(
+    storage: &CommonParamtersMap<E>,
+    (alpha, beta, tau): (i32, i32, i32),
+) -> CommonParamter<E>
+where
+    E: Engine,
+    E::G1: WnafGroup,
+    E::G2: WnafGroup,
+{
+    unimplemented!();
+}
+
+pub fn verify_common_paramter<E>(
+    storage: &CommonParamtersMap<E>,
+    new_paramter: &CommonParamter<E>,
+) -> CommonParamtersMap<E>
+where
+    E: Engine,
+    E::G1: WnafGroup,
+    E::G2: WnafGroup,
+{
+    unimplemented!();
+}
+
+pub fn mpc_common_paramters_custom_all<E>() -> CommonParamterInStorage<E>
+where
+    E: Engine,
+    E::G1: WnafGroup,
+    E::G2: WnafGroup,
+{
+    let mut paramter_in_storage = initial_common_paramters::<E>();
+
+    let player1_common = mpc_common_paramters_generatoer(&paramter_in_storage, (1, 2, 3));
+    paramter_in_storage = verify_common_paramter(&paramter_in_storage, &player1_common);
+
+    let player2_common = mpc_common_paramters_generatoer(&paramter_in_storage, (2, 3, 4));
+    paramter_in_storage = verify_common_paramter(&paramter_in_storage, &player2_common);
+
+    let player3_common = mpc_common_paramters_generatoer(&paramter_in_storage, (3, 4, 5));
+    paramter_in_storage = verify_common_paramter(&paramter_in_storage, &player3_common);
+
+    paramter_in_storage.get_last()
 }
 
 //非通用计算参数

@@ -199,9 +199,9 @@ where
     let cp_m = cp.matrix(&assembly.at_aux, &assembly.bt_aux, &assembly.ct_aux);
     let ucp = mpc_uncommon_paramters_custom_all::<E>(&cp_m);
     let vk = VerifyingKey::<E> {
-        alpha_g1: cp.alpha.g1_result.unwrap(),
-        beta_g1: cp.beta.g1_result.unwrap(),
-        beta_g2: cp.beta.g2_result.unwrap(),
+        alpha_g1: cp.alpha_g1,
+        beta_g1: cp.beta_g1,
+        beta_g2: cp.beta_g2,
         gamma_g2: ucp.gamma.g2_result.unwrap(),
         delta_g1: ucp.delta.g1_result.unwrap(),
         delta_g2: ucp.delta.g2_result.unwrap(),
