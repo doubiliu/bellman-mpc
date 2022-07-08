@@ -196,7 +196,13 @@ where
     let mut b_g2 = vec![E::G2Affine::identity(); assembly.num_inputs + assembly.num_aux];
 
     let cp = mpc_common_paramters_custom_all::<E>();
-    let cp_m = cp.matrix(&assembly.at_aux, &assembly.bt_aux, &assembly.ct_aux);
+    let cp_m = cp.matrix(
+        &assembly.at_aux,
+        &assembly.bt_aux,
+        &assembly.ct_aux,
+        assembly.num_inputs,
+        assembly.num_aux,
+    );
     let ucp = mpc_uncommon_paramters_custom_all::<E>(&cp_m);
     let vk = VerifyingKey::<E> {
         alpha_g1: cp.alpha_g1,

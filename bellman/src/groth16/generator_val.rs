@@ -17,27 +17,17 @@ use crate::multicore::Worker;
 use bls12_381::Bls12;
 
 use crate::groth16::mpc::{ParameterPair, TauParameterPair};
-pub fn generator_val<E: Engine>() -> ParameterPair<E> {
-    //多人运算验证，产生一个随机点，初始值是g1/g2，
-    //[1,2,3,4]这几个人运算之后得到4!*g1或4!*g2
-    unimplemented!();
-}
 
-pub fn generator_val_from<E: Engine>(p: &ParameterPair<E>) -> ParameterPair<E> {
-    //多人运算验证，产生一个随机点，初始值是p，
-    //[1,2,3,4]这几个人运算之后得到4!*p
-    unimplemented!();
-}
-
-pub fn generator_tau<E: Engine>() -> TauParameterPair<E> {
-    //多人运算验证，产生一系列指数增长的随机点，初始值是[g1,g1,g1,g1]，
-    //[1,2,3,4]这几个人运算之后得到[[g1,g1,g1,g1],[g1,2*g1,3*g1,4*g1],[g1,4*g1,9*g1,16*g1].....]
-    unimplemented!();
-}
-
-pub fn generator_tau_from<E: Engine>(tau: &ParameterPair<E>) -> TauParameterPair<E> {
-    //多人运算验证，产生一系列指数增长的随机点，初始值是[tau0,tau1,tau2,tau3]，
-    //[1,2,3,4]这几个人运算之后得到[[tau0,tau1,tau2,tau3],[tau0,2*tau1,3*tau2,4*tau3],[tau0,4*tau1,9*tau2,16*tau3].....]
+pub fn matrix_eval<E>(
+    matrix: &Vec<Vec<(E::Fr, usize)>>,
+    tau_g1: &Vec<E::G1Affine>,
+    tau_g2: &Vec<E::G2Affine>,
+) -> (Vec<E::G1Affine>, Vec<E::G2Affine>)
+where
+    E: Engine,
+    E::G1: WnafGroup,
+    E::G2: WnafGroup,
+{
     unimplemented!();
 }
 
