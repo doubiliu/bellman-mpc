@@ -201,21 +201,22 @@ where
         &assembly.ct_aux,
         assembly.num_inputs,
         assembly.num_aux,
+        assembly.num_constraints,
     );
     let ucp = mpc_uncommon_paramters_custom_all::<E>(&cp_m);
     let vk = VerifyingKey::<E> {
         alpha_g1: cp.alpha_g1.to_affine(),
         beta_g1: cp.beta_g1.to_affine(),
         beta_g2: cp.beta_g2.to_affine(),
-        gamma_g2: ucp.gamma.g2_result.unwrap().to_affine(),
-        delta_g1: ucp.delta.g1_result.unwrap().to_affine(),
-        delta_g2: ucp.delta.g2_result.unwrap().to_affine(),
-        ic: ucp.ic.get_g1_affine(),
+        gamma_g2: ucp.gamma_g2.to_affine(),
+        delta_g1: ucp.delta_g1.to_affine(),
+        delta_g2: ucp.delta_g2.to_affine(),
+        ic: vec_to_list::<E>(&ucp.kin_g1),
     };
     Ok(Parameters {
         vk,
-        h: Arc::new(ucp.h.get_g1_affine()),
-        l: Arc::new(ucp.l.get_g1_affine()),
+        h: Arc::new(vec_to_list::<E>(&ucp.h_g1)),
+        l: Arc::new(vec_to_list::<E>(&ucp.kout_g1)),
         // Filter points at infinity away from A/B queries
         a: Arc::new(
             a.into_iter()
@@ -583,4 +584,17 @@ where
                 .collect(),
         ),
     })
+}
+
+pub fn vec_to_list<E>(list: &Vec<E::G1>) -> Vec<E::G1Affine>
+where
+    E: Engine,
+    E::G1: WnafGroup,
+    E::G2: WnafGroup,
+{
+    let mut result = Vec::new();
+    for i in 0..list.len() {
+        result.push(list[i].to_affine());
+    }
+    result
 }

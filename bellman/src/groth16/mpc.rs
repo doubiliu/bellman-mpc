@@ -139,11 +139,11 @@ where
     let g2 = E::G2::generator();
     let g1 = E::G1::generator();
     let g1_before = paramter_last.g1_result.unwrap();
-    let g1_after = (g1 * my_alpha);
+    let g1_after = g1 * my_alpha;
     let g2_before = paramter_last.g2_result.unwrap();
-    let g2_after = (g2 * my_alpha);
-    let g1_mine = (g1);
-    let g2_mine = (g2 * my_alpha);
+    let g2_after = g2 * my_alpha;
+    let g1_mine = g1 * my_alpha;
+    let g2_mine = g2 * my_alpha;
     let result = ParameterPair {
         g1_result: Some(g1_after),
         g2_result: Some(g2_after),
@@ -450,6 +450,7 @@ where
         ct_aux: &Vec<Vec<(E::Fr, usize)>>,
         num_inputs: usize,
         num_aux: usize,
+        num_constraints: usize,
     ) -> CommonParamterMatrix<E>
     where
         E: Engine,
@@ -462,46 +463,39 @@ where
             list_mul_matrix::<E>(&self.beta_mul_tau_g1, &self.beta_mul_tau_g2, at_aux);
         let (tau_matrix_g1, tau_matrix_g2) =
             list_mul_matrix::<E>(&self.tau_g1, &self.tau_g2, ct_aux);
-        let mut matrixed_g1_front = E::G1::identity();
-        let mut matrixed_g2_front = E::G2::identity();
-        let mut matrixed_g1_back = E::G1::identity();
-        let mut matrixed_g2_back = E::G2::identity();
+        let mut matrixed_g1_front = Vec::new();
+        let mut matrixed_g2_front = Vec::new();
+        let mut matrixed_g1_back = Vec::new();
+        let mut matrixed_g2_back = Vec::new();
+        let mut matrixed_h_g1 = Vec::new();
+        let mut matrixed_h_g2 = Vec::new();
 
         for i in 0..num_aux + num_inputs {
             if i < num_aux {
-                matrixed_g1_front =
-                    matrixed_g1_front + alpha_matrix_g1[i] + beta_matrix_g1[i] + tau_matrix_g1[i];
-                matrixed_g2_front =
-                    matrixed_g2_front + alpha_matrix_g2[i] + beta_matrix_g2[i] + tau_matrix_g2[i];
+                matrixed_g1_front.push(alpha_matrix_g1[i] + beta_matrix_g1[i] + tau_matrix_g1[i]);
+                matrixed_g2_front.push(alpha_matrix_g2[i] + beta_matrix_g2[i] + tau_matrix_g2[i]);
             } else {
-                matrixed_g1_back =
-                    matrixed_g1_front + alpha_matrix_g1[i] + beta_matrix_g1[i] + tau_matrix_g1[i];
-                matrixed_g2_back =
-                    matrixed_g2_front + alpha_matrix_g2[i] + beta_matrix_g2[i] + tau_matrix_g2[i];
+                matrixed_g1_back.push(alpha_matrix_g1[i] + beta_matrix_g1[i] + tau_matrix_g1[i]);
+                matrixed_g2_back.push(alpha_matrix_g2[i] + beta_matrix_g2[i] + tau_matrix_g2[i]);
             }
         }
 
+        //存疑,m，l，n值的选取
+        for i in 0..num_constraints - 1 {
+            matrixed_h_g1.push(tau_matrix_g1[num_constraints + i] - tau_matrix_g1[i]);
+            matrixed_h_g2.push(tau_matrix_g2[num_constraints + i] - tau_matrix_g2[i]);
+        }
+
         CommonParamterMatrix {
-            matrixed_g1_front: matrixed_g1_front - E::G1::identity(),
-            matrixed_g2_front: matrixed_g2_front - E::G2::identity(),
-            matrixed_g1_back: matrixed_g1_back - E::G1::identity(),
-            matrixed_g2_back: matrixed_g2_back - E::G2::identity(),
+            matrixed_g1_front,
+            matrixed_g2_front,
+            matrixed_g1_back,
+            matrixed_g2_back,
+            matrixed_h_g1,
+            matrixed_h_g2,
         }
     }
 }
-/*
-use std::collections::HashMap;
-pub struct CommonParamtersMap<E: Engine> {
-    len: i32,
-    map: HashMap<i32, CommonParamterInStorage<E>>,
-}
-
-impl<E: Engine> CommonParamtersMap<E> {
-    pub fn get_last(&self) -> CommonParamterInStorage<E> {
-        let last_index = self.len;
-        self.map[&last_index].clone()
-    }
-}*/
 
 pub fn make_new_paramter<E>(
     x: &u64,
@@ -509,17 +503,27 @@ pub fn make_new_paramter<E>(
     pointg2: &E::G2,
     baseg1: &E::G1,
     baseg2: &E::G2,
+    inverse: bool,
 ) -> ParameterPair<E>
 where
     E: Engine,
     E::G1: WnafGroup,
     E::G2: WnafGroup,
 {
-    ParameterPair::<E> {
-        g1_result: Some(*pointg1 * E::Fr::from(*x)),
-        g2_result: Some(*pointg2 * E::Fr::from(*x)),
-        g1_mine: Some(*baseg1 * E::Fr::from(*x)),
-        g2_mine: Some(*baseg2 * E::Fr::from(*x)),
+    if inverse == false {
+        ParameterPair::<E> {
+            g1_result: Some(*pointg1 * E::Fr::from(*x)),
+            g2_result: Some(*pointg2 * E::Fr::from(*x)),
+            g1_mine: Some(*baseg1 * E::Fr::from(*x)),
+            g2_mine: Some(*baseg2 * E::Fr::from(*x)),
+        }
+    } else {
+        ParameterPair::<E> {
+            g1_result: Some(*pointg1 * E::Fr::from(*x).invert().unwrap()),
+            g2_result: Some(*pointg2 * E::Fr::from(*x).invert().unwrap()),
+            g1_mine: Some(*baseg1 * E::Fr::from(*x).invert().unwrap()),
+            g2_mine: Some(*baseg2 * E::Fr::from(*x).invert().unwrap()),
+        }
     }
 }
 
@@ -527,6 +531,7 @@ pub fn make_new_tau_paramter<E>(
     x: &u64,
     pointg1_list: &Vec<E::G1>,
     pointg2_list: &Vec<E::G2>,
+    invert: bool,
 ) -> TauParameterPair<E>
 where
     E: Engine,
@@ -544,6 +549,7 @@ where
             &pointg2_list[i],
             &base_g1,
             &base_g2,
+            invert,
         ));
     }
     TauParameterPair { list }
@@ -572,19 +578,28 @@ where
     let g1 = E::G1::generator();
     let g2 = E::G2::generator();
     //从common里拿出alpha数据，计算本次alpha
-    let new_alpha = make_new_paramter::<E>(&alpha, &storage.alpha_g1, &storage.alpha_g2, &g1, &g2);
+    let new_alpha = make_new_paramter::<E>(
+        &alpha,
+        &storage.alpha_g1,
+        &storage.alpha_g2,
+        &g1,
+        &g2,
+        false,
+    );
 
     //从common里拿出alpha数据，计算本次beta
-    let new_beta = make_new_paramter::<E>(&beta, &storage.beta_g1, &storage.beta_g2, &g1, &g2);
+    let new_beta =
+        make_new_paramter::<E>(&beta, &storage.beta_g1, &storage.beta_g2, &g1, &g2, false);
 
     //从common里拿出x数据，计算本次x[]
-    let new_tau = make_new_tau_paramter::<E>(&tau, &storage.tau_g1, &storage.tau_g2);
+    let new_tau = make_new_tau_paramter::<E>(&tau, &storage.tau_g1, &storage.tau_g2, false);
 
     //计算alpha*x[]
     let new_alpha_mul_tau = make_new_tau_paramter::<E>(
         &(alpha * tau),
         &storage.alpha_mul_tau_g1,
         &storage.alpha_mul_tau_g2,
+        false,
     );
     //计算beta*x[]
 
@@ -592,6 +607,7 @@ where
         &(beta * tau),
         &storage.beta_mul_tau_g1,
         &storage.beta_mul_tau_g2,
+        false,
     );
     //return
     CommonParamter {
@@ -613,6 +629,13 @@ where
         &paramter.g1_result.unwrap().to_affine(),
         &E::G2Affine::generator(),
     ) == E::pairing(&baseg1.to_affine(), &paramter.g2_mine.unwrap().to_affine())
+        && E::pairing(
+            &paramter.g1_result.unwrap().to_affine(),
+            &E::G2Affine::generator(),
+        ) == E::pairing(
+            &E::G1Affine::generator(),
+            &paramter.g2_result.unwrap().to_affine(),
+        )
 }
 
 pub fn verify_common_paramter<E>(
@@ -711,6 +734,28 @@ where
     pub l: TauParameterPair<E>,
     pub h: TauParameterPair<E>,
 }
+
+impl<E> UnCommonParamter<E>
+where
+    E: Engine,
+    E::G1: WnafGroup,
+    E::G2: WnafGroup,
+{
+    pub fn to_storage_format(&self) -> UnCommonParamterInStorage<E> {
+        UnCommonParamterInStorage {
+            gamma_g1: self.gamma.g1_result.unwrap(),
+            gamma_g2: self.gamma.g2_result.unwrap(),
+            delta_g1: self.delta.g1_result.unwrap(),
+            delta_g2: self.delta.g2_result.unwrap(),
+            kin_g1: self.ic.get_g1(),
+            kin_g2: self.ic.get_g2(),
+            kout_g1: self.l.get_g1(),
+            kout_g2: self.l.get_g2(),
+            h_g1: self.h.get_g1(),
+            h_g2: self.h.get_g2(),
+        }
+    }
+}
 #[derive(Debug, Clone)]
 pub struct UnCommonParamterInStorage<E>
 where
@@ -718,29 +763,17 @@ where
     E::G1: WnafGroup,
     E::G2: WnafGroup,
 {
-    pub alpha_g1: E::G1Affine,
-    /*pub alpha_g2: E::G2Affine,
-    pub beta_g1: E::G1Affine,
-    pub beta_g2: E::G2Affine,
-    pub tau_g1: Vec<E::G1Affine>,
-    pub tau_g2: Vec<E::G2Affine>,
-    pub alpha_mul_tau_g1: Vec<E::G1Affine>,
-    pub alpha_mul_tau_g2: Vec<E::G2Affine>,
-    pub beta_mul_tau_g1: Vec<E::G1Affine>,
-    pub beta_mul_tau_g2: Vec<E::G2Affine>,*/
+    pub gamma_g1: E::G1,
+    pub gamma_g2: E::G2,
+    pub delta_g1: E::G1,
+    pub delta_g2: E::G2,
+    pub kin_g1: Vec<E::G1>,
+    pub kin_g2: Vec<E::G2>,
+    pub kout_g1: Vec<E::G1>,
+    pub kout_g2: Vec<E::G2>,
+    pub h_g1: Vec<E::G1>,
+    pub h_g2: Vec<E::G2>,
 }
-/*
-pub struct UnCommonParamtersMap<E: Engine> {
-    len: i32,
-    map: HashMap<i32, UnCommonParamterInStorage<E>>,
-}
-
-impl<E: Engine> UnCommonParamtersMap<E> {
-    pub fn get_last(&self) -> UnCommonParamterInStorage<E> {
-        let last_index = self.len;
-        self.map[&last_index].clone()
-    }
-}*/
 
 pub struct CommonParamterMatrix<E>
 where
@@ -748,16 +781,18 @@ where
     E::G1: WnafGroup,
     E::G2: WnafGroup,
 {
-    pub matrixed_g1_front: E::G1,
-    pub matrixed_g2_front: E::G2,
-    pub matrixed_g1_back: E::G1,
-    pub matrixed_g2_back: E::G2,
+    pub matrixed_g1_front: Vec<E::G1>,
+    pub matrixed_g2_front: Vec<E::G2>,
+    pub matrixed_g1_back: Vec<E::G1>,
+    pub matrixed_g2_back: Vec<E::G2>,
+    pub matrixed_h_g1: Vec<E::G1>,
+    pub matrixed_h_g2: Vec<E::G2>,
 }
 
 //要传给进行非通用计算的用户使用公共计算产生的参数和电路产生的矩阵运算非通用计算参数
 pub fn mpc_uncommon_paramters_custom_all<E: Engine>(
     common_paramter_matrix: &CommonParamterMatrix<E>,
-) -> UnCommonParamter<E>
+) -> UnCommonParamterInStorage<E>
 where
     E: Engine,
     E::G1: WnafGroup,
@@ -768,20 +803,30 @@ where
     //under-chain
     let player1_common = mpc_uncommon_paramters_generator(&paramter_in_storage, (1, 2));
     //on-chain
-    paramter_in_storage = verify_uncommon_paramter(&paramter_in_storage, &player1_common);
+    paramter_in_storage = verify_uncommon_paramter(
+        &common_paramter_matrix,
+        &paramter_in_storage,
+        &player1_common,
+    );
     //under-chain
     let player2_common = mpc_uncommon_paramters_generator(&paramter_in_storage, (2, 3));
     //on-chain
-    paramter_in_storage = verify_uncommon_paramter(&paramter_in_storage, &player2_common);
+    paramter_in_storage = verify_uncommon_paramter(
+        &common_paramter_matrix,
+        &paramter_in_storage,
+        &player2_common,
+    );
     //under-chain
     let player3_common = mpc_uncommon_paramters_generator(&paramter_in_storage, (3, 4));
     //on-chain
-    paramter_in_storage = verify_uncommon_paramter(&paramter_in_storage, &player3_common);
+    paramter_in_storage = verify_uncommon_paramter(
+        &common_paramter_matrix,
+        &paramter_in_storage,
+        &player3_common,
+    );
 
     //on-chain
-    paramter_in_storage;
-
-    unimplemented!()
+    paramter_in_storage
 }
 
 pub fn initial_uncommon_paramters<E>(
@@ -799,17 +844,54 @@ where
 
 pub fn mpc_uncommon_paramters_generator<E>(
     storage: &UnCommonParamterInStorage<E>,
-    (gamma, delta): (i32, i32),
+    (gamma, delta): (u64, u64),
 ) -> UnCommonParamter<E>
 where
     E: Engine,
     E::G1: WnafGroup,
     E::G2: WnafGroup,
 {
-    unimplemented!();
+    let g1 = E::G1::generator();
+    let g2 = E::G2::generator();
+    //从uncommon里拿出delta数据，计算本次delta
+    let new_delta = make_new_paramter::<E>(
+        &delta,
+        &storage.delta_g1,
+        &storage.delta_g2,
+        &g1,
+        &g2,
+        false,
+    );
+
+    //从uncommon里拿出gamma数据，计算本次gamma
+    let new_gamma = make_new_paramter::<E>(
+        &gamma,
+        &storage.gamma_g1,
+        &storage.delta_g2,
+        &g1,
+        &g2,
+        false,
+    );
+
+    //从uncommon里拿出Kin数据，计算本次Kin
+    let new_kin = make_new_tau_paramter::<E>(&gamma, &storage.kin_g1, &storage.kin_g2, true);
+
+    //从uncommon里拿出Kin数据，计算本次Kin
+    let new_kout = make_new_tau_paramter::<E>(&delta, &storage.kout_g1, &storage.kout_g2, true);
+
+    let new_h = make_new_tau_paramter::<E>(&delta, &storage.h_g1, &storage.h_g2, true);
+
+    UnCommonParamter {
+        gamma: new_gamma,
+        delta: new_delta,
+        ic: new_kin,
+        l: new_kout,
+        h: new_h,
+    }
 }
 
 pub fn verify_uncommon_paramter<E>(
+    common_paramter_matrix: &CommonParamterMatrix<E>,
     storage: &UnCommonParamterInStorage<E>,
     new_paramter: &UnCommonParamter<E>,
 ) -> UnCommonParamterInStorage<E>
@@ -818,5 +900,59 @@ where
     E::G1: WnafGroup,
     E::G2: WnafGroup,
 {
-    unimplemented!();
+    let mut result_kin = true;
+    let mut result_kout = true;
+    let mut result_h = true;
+    //验证delta一致性
+    //验证delta正确性
+    //验证gamma一致性
+    //验证gamma正确性
+    let result_delta =
+        verify_new_paramter(&new_paramter.delta, &storage.delta_g1, &storage.delta_g2);
+
+    let result_gamma =
+        verify_new_paramter(&new_paramter.gamma, &storage.gamma_g1, &storage.gamma_g2);
+
+    //验证kin正确性
+    for i in 0..storage.kin_g1.len() {
+        result_kin = result_kin
+            && E::pairing(
+                &new_paramter.ic.list[i].g1_result.unwrap().to_affine(),
+                &new_paramter.gamma.g2_result.unwrap().to_affine(),
+            ) == E::pairing(
+                &common_paramter_matrix.matrixed_g1_front[i].to_affine(),
+                &E::G2Affine::generator(),
+            );
+    }
+
+    //验证kout正确性
+    for i in 0..storage.kout_g1.len() {
+        result_kout = result_kout
+            && E::pairing(
+                &new_paramter.l.list[i].g1_result.unwrap().to_affine(),
+                &new_paramter.delta.g2_result.unwrap().to_affine(),
+            ) == E::pairing(
+                &common_paramter_matrix.matrixed_g1_front[i].to_affine(),
+                &E::G2Affine::generator(),
+            );
+    }
+
+    //验证h正确性
+    for i in 0..storage.h_g1.len() {
+        result_kin = result_kin
+            && E::pairing(
+                &new_paramter.h.list[i].g1_result.unwrap().to_affine(),
+                &new_paramter.delta.g2_result.unwrap().to_affine(),
+            ) == E::pairing(
+                &common_paramter_matrix.matrixed_g1_front[i].to_affine(),
+                &E::G2Affine::generator(),
+            );
+    }
+
+    assert_eq!(
+        result_kin && result_kout && result_h && result_delta && result_gamma,
+        true
+    );
+
+    new_paramter.to_storage_format()
 }
