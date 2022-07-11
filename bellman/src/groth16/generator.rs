@@ -155,7 +155,6 @@ impl<Scalar: PrimeField> ConstraintSystem<Scalar> for KeypairAssembly<Scalar> {
     }
 }
 
-use crate::groth16::generator_val::{matrix_mul_tau, tau_list_add};
 use crate::groth16::mpc::{
     mpc_common_paramters_custom_all, mpc_uncommon_paramters_custom_all, CommonParamter,
     UnCommonParamter,
@@ -205,18 +204,18 @@ where
     );
     let ucp = mpc_uncommon_paramters_custom_all::<E>(&cp_m);
     let vk = VerifyingKey::<E> {
-        alpha_g1: cp.alpha_g1,
-        beta_g1: cp.beta_g1,
-        beta_g2: cp.beta_g2,
-        gamma_g2: ucp.gamma.g2_result.unwrap(),
-        delta_g1: ucp.delta.g1_result.unwrap(),
-        delta_g2: ucp.delta.g2_result.unwrap(),
-        ic: ucp.ic.get_g1(),
+        alpha_g1: cp.alpha_g1.to_affine(),
+        beta_g1: cp.beta_g1.to_affine(),
+        beta_g2: cp.beta_g2.to_affine(),
+        gamma_g2: ucp.gamma.g2_result.unwrap().to_affine(),
+        delta_g1: ucp.delta.g1_result.unwrap().to_affine(),
+        delta_g2: ucp.delta.g2_result.unwrap().to_affine(),
+        ic: ucp.ic.get_g1_affine(),
     };
     Ok(Parameters {
         vk,
-        h: Arc::new(ucp.h.get_g1()),
-        l: Arc::new(ucp.l.get_g1()),
+        h: Arc::new(ucp.h.get_g1_affine()),
+        l: Arc::new(ucp.l.get_g1_affine()),
         // Filter points at infinity away from A/B queries
         a: Arc::new(
             a.into_iter()

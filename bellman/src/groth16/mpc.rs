@@ -16,18 +16,28 @@ use crate::multicore::Worker;
 
 use bls12_381::Bls12;
 #[derive(Clone, Copy)]
-pub struct ParameterPair<E: Engine> {
-    pub g1_result: Option<E::G1Affine>,
-    pub g2_result: Option<E::G2Affine>,
-    pub g1_mine: Option<E::G1Affine>,
-    pub g2_mine: Option<E::G2Affine>,
+pub struct ParameterPair<E>
+where
+    E: Engine,
+    E::G1: WnafGroup,
+    E::G2: WnafGroup,
+{
+    pub g1_result: Option<E::G1>,
+    pub g2_result: Option<E::G2>,
+    pub g1_mine: Option<E::G1>,
+    pub g2_mine: Option<E::G2>,
 }
 
-impl<E: Engine> ParameterPair<E> {
-    fn get_g1(&self) -> E::G1Affine {
+impl<E> ParameterPair<E>
+where
+    E: Engine,
+    E::G1: WnafGroup,
+    E::G2: WnafGroup,
+{
+    fn get_g1(&self) -> E::G1 {
         self.g1_result.unwrap()
     }
-    fn get_g2(&self) -> E::G2Affine {
+    fn get_g2(&self) -> E::G2 {
         self.g2_result.unwrap()
     }
 }
@@ -39,8 +49,8 @@ where
     E::G2: WnafGroup,
 {
     let mut newp = ParameterPair {
-        g1_result: Some(E::G1Affine::generator()),
-        g2_result: Some(E::G2Affine::generator()),
+        g1_result: Some(E::G1::generator()),
+        g2_result: Some(E::G2::generator()),
         g1_mine: None,
         g2_mine: None,
     };
@@ -59,8 +69,8 @@ where
     let mut newp = ParameterPair {
         g1_result: None,
         g2_result: None,
-        g1_mine: Some(E::G1Affine::generator()),
-        g2_mine: Some(E::G2Affine::generator()),
+        g1_mine: Some(E::G1::generator()),
+        g2_mine: Some(E::G2::generator()),
     };
     let x = p.clone();
     let len = vec.len();
@@ -82,16 +92,16 @@ where
     E::G2: WnafGroup,
 {
     mpc_common_paramters_custom::<E>(
-        E::G1Affine::generator(),
-        E::G2Affine::generator(),
+        E::G1::generator(),
+        E::G2::generator(),
         paramter_last,
         my_alpha,
     )
 }
 
 pub fn mpc_common_paramters_custom<E>(
-    g1: E::G1Affine,
-    g2: E::G2Affine,
+    g1: E::G1,
+    g2: E::G2,
     paramter_last: &ParameterPair<E>,
     my_alpha: E::Fr,
 ) -> Result<ParameterPair<E>, SynthesisError>
@@ -103,11 +113,11 @@ where
     //let g2 = E::G2::generator();
     //let g1 = E::G1::generator();
     let g1_before = paramter_last.g1_result.unwrap();
-    let g1_after = (g1_before * my_alpha).to_affine();
+    let g1_after = (g1_before * my_alpha);
     let g2_before = paramter_last.g2_result.unwrap();
-    let g2_after = (g2_before * my_alpha).to_affine();
-    let g1_mine = (g1 * my_alpha).to_affine();
-    let g2_mine = (g2 * my_alpha).to_affine();
+    let g2_after = (g2_before * my_alpha);
+    let g1_mine = (g1 * my_alpha);
+    let g2_mine = (g2 * my_alpha);
     let result = ParameterPair {
         g1_result: Some(g1_after),
         g2_result: Some(g2_after),
@@ -129,11 +139,11 @@ where
     let g2 = E::G2::generator();
     let g1 = E::G1::generator();
     let g1_before = paramter_last.g1_result.unwrap();
-    let g1_after = (g1 * my_alpha).to_affine();
+    let g1_after = (g1 * my_alpha);
     let g2_before = paramter_last.g2_result.unwrap();
-    let g2_after = (g2 * my_alpha).to_affine();
-    let g1_mine = (g1).to_affine();
-    let g2_mine = (g2 * my_alpha).to_affine();
+    let g2_after = (g2 * my_alpha);
+    let g1_mine = (g1);
+    let g2_mine = (g2 * my_alpha);
     let result = ParameterPair {
         g1_result: Some(g1_after),
         g2_result: Some(g2_after),
@@ -151,8 +161,8 @@ where
 {
     let g1 = E::G1::generator();
     let g2 = E::G2::generator();
-    let mut result = E::pairing(&new_paramter.g1_mine.unwrap(), &g2.to_affine())
-        == E::pairing(&g1.to_affine(), &new_paramter.g2_mine.unwrap());
+    let mut result = E::pairing(&new_paramter.g1_mine.unwrap().to_affine(), &g2.to_affine())
+        == E::pairing(&g1.to_affine(), &new_paramter.g2_mine.unwrap().to_affine());
     let index = paramters.len();
 
     if (index >= 1) {
@@ -163,29 +173,55 @@ where
         let paramter_part2 = paramters[index - 1].g2_mine.unwrap();
         let paramter_part1 = paramters[index - 2].g1_result.unwrap();*/
         result = result
-            && E::pairing(&paramter_last, &g2.to_affine())
-                == E::pairing(&paramter_part1, &paramter_part2);
+            && E::pairing(&paramter_last.to_affine(), &g2.to_affine())
+                == E::pairing(&paramter_part1.to_affine(), &paramter_part2.to_affine());
     }
     result
 }
 
 #[derive(Clone)]
-pub struct TauParameterPair<E: Engine> {
+pub struct TauParameterPair<E>
+where
+    E: Engine,
+    E::G1: WnafGroup,
+    E::G2: WnafGroup,
+{
     pub list: Vec<ParameterPair<E>>,
 }
 
-impl<E: Engine> TauParameterPair<E> {
-    pub fn get_g1(&self) -> Vec<E::G1Affine> {
+impl<E> TauParameterPair<E>
+where
+    E: Engine,
+    E::G1: WnafGroup,
+    E::G2: WnafGroup,
+{
+    pub fn get_g1(&self) -> Vec<E::G1> {
         let mut result = Vec::new();
         for i in 0..self.list.len() {
             result.push(self.list[i].get_g1())
         }
         result
     }
-    pub fn get_g2(&self) -> Vec<E::G2Affine> {
+    pub fn get_g1_affine(&self) -> Vec<E::G1Affine> {
+        let mut result = Vec::new();
+        for i in 0..self.list.len() {
+            result.push(self.list[i].get_g1().to_affine())
+        }
+        result
+    }
+
+    pub fn get_g2(&self) -> Vec<E::G2> {
         let mut result = Vec::new();
         for i in 0..self.list.len() {
             result.push(self.list[i].get_g2())
+        }
+        result
+    }
+
+    pub fn get_g2_affine(&self) -> Vec<E::G2Affine> {
+        let mut result = Vec::new();
+        for i in 0..self.list.len() {
+            result.push(self.list[i].get_g2().to_affine())
         }
         result
     }
@@ -200,8 +236,8 @@ where
     let mut result = Vec::new();
     for i in 0..n {
         result.push(ParameterPair {
-            g1_result: Some(E::G1Affine::generator()),
-            g2_result: Some(E::G2Affine::generator()),
+            g1_result: Some(E::G1::generator()),
+            g2_result: Some(E::G2::generator()),
             g1_mine: None,
             g2_mine: None,
         });
@@ -219,16 +255,16 @@ where
     E::G2: WnafGroup,
 {
     mpc_common_tauparamters_custom(
-        E::G1Affine::generator(),
-        E::G2Affine::generator(),
+        E::G1::generator(),
+        E::G2::generator(),
         tauparamter_last,
         my_x,
     )
 }
 
 pub fn mpc_common_tauparamters_custom<E>(
-    g1: E::G1Affine,
-    g2: E::G2Affine,
+    g1: E::G1,
+    g2: E::G2,
     tauparamter_last: &TauParameterPair<E>,
     my_x: Vec<E::Fr>,
 ) -> Result<TauParameterPair<E>, SynthesisError>
@@ -244,11 +280,11 @@ where
     assert_eq!(len, tauparamter_last.list.len());
     for i in 0..len {
         let xg1_before = tauparamter_last.list[i].g1_result.unwrap();
-        let xg1_after = (xg1_before * my_x[i]).to_affine();
+        let xg1_after = (xg1_before * my_x[i]);
         let xg2_before = tauparamter_last.list[i].g2_result.unwrap();
-        let xg2_after = (xg2_before * my_x[i]).to_affine();
-        let xg1_mine = (g1 * my_x[i]).to_affine();
-        let xg2_mine = (g2 * my_x[i]).to_affine();
+        let xg2_after = (xg2_before * my_x[i]);
+        let xg1_mine = (g1 * my_x[i]);
+        let xg2_mine = (g2 * my_x[i]);
 
         let result = ParameterPair {
             g1_result: Some(xg1_after),
@@ -262,7 +298,7 @@ where
     return Ok(TauParameterPair { list: result_list });
 }
 
-pub fn TauParamterListExcute<E: Engine>(
+pub fn TauParamterListExcute<E>(
     mut vec: Vec<TauParameterPair<E>>,
     p: TauParameterPair<E>,
 ) -> Vec<TauParameterPair<E>>
@@ -290,9 +326,9 @@ where
         for i in 1..t_len {
             result = result
                 && E::pairing(
-                    &new_xparamter.list[i - 1].g1_result.unwrap(),
-                    &new_xparamter.list[0].g2_result.unwrap(),
-                ) == E::pairing(&new_xparamter.list[i].g1_result.unwrap(), &g2);
+                    &new_xparamter.list[i - 1].g1_result.unwrap().to_affine(),
+                    &new_xparamter.list[0].g2_result.unwrap().to_affine(),
+                ) == E::pairing(&new_xparamter.list[i].g1_result.unwrap().to_affine(), &g2);
         }
     }
     return result;
@@ -317,11 +353,13 @@ where
     result = result && verify_mpc_g1(&new_xparamter.list[0], &list);
     result
 }
-
-use crate::groth16::generator::KeypairAssembly;
-use crate::groth16::generator_val::*;
 //公共计算产生的参数，要传给进行非通用计算的用户
-pub struct CommonParamter<E: Engine> {
+pub struct CommonParamter<E>
+where
+    E: Engine,
+    E::G1: WnafGroup,
+    E::G2: WnafGroup,
+{
     pub alpha: ParameterPair<E>,
     pub beta: ParameterPair<E>,
     pub tau: TauParameterPair<E>,
@@ -329,7 +367,12 @@ pub struct CommonParamter<E: Engine> {
     pub beta_mul_tau: TauParameterPair<E>,
 }
 
-impl<E: Engine> CommonParamter<E> {
+impl<E> CommonParamter<E>
+where
+    E: Engine,
+    E::G1: WnafGroup,
+    E::G2: WnafGroup,
+{
     pub fn to_storage_format(&self) -> CommonParamterInStorage<E> {
         CommonParamterInStorage {
             alpha_g1: self.alpha.get_g1(),
@@ -347,20 +390,59 @@ impl<E: Engine> CommonParamter<E> {
 }
 
 #[derive(Debug, Clone)]
-pub struct CommonParamterInStorage<E: Engine> {
-    pub alpha_g1: E::G1Affine,
-    pub alpha_g2: E::G2Affine,
-    pub beta_g1: E::G1Affine,
-    pub beta_g2: E::G2Affine,
-    pub tau_g1: Vec<E::G1Affine>,
-    pub tau_g2: Vec<E::G2Affine>,
-    pub alpha_mul_tau_g1: Vec<E::G1Affine>,
-    pub alpha_mul_tau_g2: Vec<E::G2Affine>,
-    pub beta_mul_tau_g1: Vec<E::G1Affine>,
-    pub beta_mul_tau_g2: Vec<E::G2Affine>,
+pub struct CommonParamterInStorage<E>
+where
+    E: Engine,
+    E::G1: WnafGroup,
+    E::G2: WnafGroup,
+{
+    pub alpha_g1: E::G1,
+    pub alpha_g2: E::G2,
+    pub beta_g1: E::G1,
+    pub beta_g2: E::G2,
+    pub tau_g1: Vec<E::G1>,
+    pub tau_g2: Vec<E::G2>,
+    pub alpha_mul_tau_g1: Vec<E::G1>,
+    pub alpha_mul_tau_g2: Vec<E::G2>,
+    pub beta_mul_tau_g1: Vec<E::G1>,
+    pub beta_mul_tau_g2: Vec<E::G2>,
 }
 
-impl<E: Engine> CommonParamterInStorage<E> {
+fn list_mul_matrix<E>(
+    list_g1: &Vec<E::G1>,
+    list_g2: &Vec<E::G2>,
+    matrix: &Vec<Vec<(E::Fr, usize)>>,
+) -> (Vec<E::G1>, Vec<E::G2>)
+where
+    E: Engine,
+    E::G1: WnafGroup,
+    E::G2: WnafGroup,
+{
+    let len = matrix[0].len();
+    assert!(len == list_g2.len());
+    assert!(len == list_g1.len());
+    let mut result_g1 = Vec::new();
+    let mut result_g2 = Vec::new();
+    for i in 0..matrix.len() {
+        for j in 0..len {
+            if i == 0 {
+                result_g1.push(list_g1[j] * matrix[i][j].0);
+                result_g2.push(list_g2[j] * matrix[i][j].0);
+            } else {
+                result_g1[j] = result_g1[j] + list_g1[j] * matrix[i][j].0;
+                result_g2[j] = result_g2[j] + list_g2[j] * matrix[i][j].0;
+            }
+        }
+    }
+    (result_g1, result_g2)
+}
+
+impl<E> CommonParamterInStorage<E>
+where
+    E: Engine,
+    E::G1: WnafGroup,
+    E::G2: WnafGroup,
+{
     pub fn matrix(
         &self,
         at_aux: &Vec<Vec<(E::Fr, usize)>>,
@@ -368,20 +450,43 @@ impl<E: Engine> CommonParamterInStorage<E> {
         ct_aux: &Vec<Vec<(E::Fr, usize)>>,
         num_inputs: usize,
         num_aux: usize,
-    ) -> CommonParamterMatrix<E> {
-        //两种泛型匹配出问题了
-        //let tau_matrix = matrix_mul_tau::<E>(&ct_aux, &self.tau.get_g1());
-        /*
-        let alpha_mul_tau_matrix = matrix_eval(ct_aux,&self.tau_g1,&self.tau_g2);
-        let beta_mul_tau_matrix =  matrix_eval(ct_aux,&self.tau_g1,&self.tau_g2);
-        let tau_matrix = matrix_eval(ct_aux,&self.tau_g1,&self.tau_g2);
+    ) -> CommonParamterMatrix<E>
+    where
+        E: Engine,
+        E::G1: WnafGroup,
+        E::G2: WnafGroup,
+    {
+        let (alpha_matrix_g1, alpha_matrix_g2) =
+            list_mul_matrix::<E>(&self.alpha_mul_tau_g1, &self.alpha_mul_tau_g2, bt_aux);
+        let (beta_matrix_g1, beta_matrix_g2) =
+            list_mul_matrix::<E>(&self.beta_mul_tau_g1, &self.beta_mul_tau_g2, at_aux);
+        let (tau_matrix_g1, tau_matrix_g2) =
+            list_mul_matrix::<E>(&self.tau_g1, &self.tau_g2, ct_aux);
+        let mut matrixed_g1_front = E::G1::identity();
+        let mut matrixed_g2_front = E::G2::identity();
+        let mut matrixed_g1_back = E::G1::identity();
+        let mut matrixed_g2_back = E::G2::identity();
 
-        CommonParamterMatrix{
-            alpha_mul_tau_matrix,
-            beta_mul_tau_matrix,
-            tau_matrix
-        }*/
-        unimplemented!();
+        for i in 0..num_aux + num_inputs {
+            if i < num_aux {
+                matrixed_g1_front =
+                    matrixed_g1_front + alpha_matrix_g1[i] + beta_matrix_g1[i] + tau_matrix_g1[i];
+                matrixed_g2_front =
+                    matrixed_g2_front + alpha_matrix_g2[i] + beta_matrix_g2[i] + tau_matrix_g2[i];
+            } else {
+                matrixed_g1_back =
+                    matrixed_g1_front + alpha_matrix_g1[i] + beta_matrix_g1[i] + tau_matrix_g1[i];
+                matrixed_g2_back =
+                    matrixed_g2_front + alpha_matrix_g2[i] + beta_matrix_g2[i] + tau_matrix_g2[i];
+            }
+        }
+
+        CommonParamterMatrix {
+            matrixed_g1_front: matrixed_g1_front - E::G1::identity(),
+            matrixed_g2_front: matrixed_g2_front - E::G2::identity(),
+            matrixed_g1_back: matrixed_g1_back - E::G1::identity(),
+            matrixed_g2_back: matrixed_g2_back - E::G2::identity(),
+        }
     }
 }
 /*
@@ -400,10 +505,10 @@ impl<E: Engine> CommonParamtersMap<E> {
 
 pub fn make_new_paramter<E>(
     x: &u64,
-    pointg1: &E::G1Affine,
-    pointg2: &E::G2Affine,
-    baseg1: &E::G1Affine,
-    baseg2: &E::G2Affine,
+    pointg1: &E::G1,
+    pointg2: &E::G2,
+    baseg1: &E::G1,
+    baseg2: &E::G2,
 ) -> ParameterPair<E>
 where
     E: Engine,
@@ -411,25 +516,25 @@ where
     E::G2: WnafGroup,
 {
     ParameterPair::<E> {
-        g1_result: Some((*pointg1 * E::Fr::from(*x)).to_affine()),
-        g2_result: Some((*pointg2 * E::Fr::from(*x)).to_affine()),
-        g1_mine: Some((*baseg1 * E::Fr::from(*x)).to_affine()),
-        g2_mine: Some((*baseg2 * E::Fr::from(*x)).to_affine()),
+        g1_result: Some(*pointg1 * E::Fr::from(*x)),
+        g2_result: Some(*pointg2 * E::Fr::from(*x)),
+        g1_mine: Some(*baseg1 * E::Fr::from(*x)),
+        g2_mine: Some(*baseg2 * E::Fr::from(*x)),
     }
 }
 
 pub fn make_new_tau_paramter<E>(
     x: &u64,
-    pointg1_list: &Vec<E::G1Affine>,
-    pointg2_list: &Vec<E::G2Affine>,
+    pointg1_list: &Vec<E::G1>,
+    pointg2_list: &Vec<E::G2>,
 ) -> TauParameterPair<E>
 where
     E: Engine,
     E::G1: WnafGroup,
     E::G2: WnafGroup,
 {
-    let base_g1 = E::G1::generator().to_affine();
-    let base_g2 = E::G2::generator().to_affine();
+    let base_g1 = E::G1::generator();
+    let base_g2 = E::G2::generator();
     let mut list: Vec<ParameterPair<E>> = Vec::new();
     assert_eq!(pointg1_list.len(), pointg1_list.len());
     for i in 0..pointg1_list.len() {
@@ -464,8 +569,8 @@ where
     E::G1: WnafGroup,
     E::G2: WnafGroup,
 {
-    let g1 = E::G1::generator().to_affine();
-    let g2 = E::G2::generator().to_affine();
+    let g1 = E::G1::generator();
+    let g2 = E::G2::generator();
     //从common里拿出alpha数据，计算本次alpha
     let new_alpha = make_new_paramter::<E>(&alpha, &storage.alpha_g1, &storage.alpha_g2, &g1, &g2);
 
@@ -498,18 +603,16 @@ where
     }
 }
 
-pub fn verify_new_paramter<E>(
-    paramter: &ParameterPair<E>,
-    baseg1: &E::G1Affine,
-    baseg2: &E::G2Affine,
-) -> bool
+pub fn verify_new_paramter<E>(paramter: &ParameterPair<E>, baseg1: &E::G1, baseg2: &E::G2) -> bool
 where
     E: Engine,
     E::G1: WnafGroup,
     E::G2: WnafGroup,
 {
-    E::pairing(&paramter.g1_result.unwrap(), &E::G2Affine::generator())
-        == E::pairing(baseg1, &paramter.g2_mine.unwrap())
+    E::pairing(
+        &paramter.g1_result.unwrap().to_affine(),
+        &E::G2Affine::generator(),
+    ) == E::pairing(&baseg1.to_affine(), &paramter.g2_mine.unwrap().to_affine())
 }
 
 pub fn verify_common_paramter<E>(
@@ -540,11 +643,11 @@ where
         if i > 1 {
             result_tau = result_tau
                 && (E::pairing(
-                    &new_paramter.tau.list[i].g1_result.unwrap(),
+                    &new_paramter.tau.list[i].g1_result.unwrap().to_affine(),
                     &E::G2Affine::generator(),
                 ) == E::pairing(
-                    &new_paramter.tau.list[i - 1].g1_result.unwrap(),
-                    &new_paramter.tau.list[0].g2_result.unwrap(),
+                    &new_paramter.tau.list[i - 1].g1_result.unwrap().to_affine(),
+                    &new_paramter.tau.list[0].g2_result.unwrap().to_affine(),
                 ));
         }
         //从storage和新参数里验证 alpha*x
@@ -596,7 +699,12 @@ where
 }
 
 //非通用计算参数
-pub struct UnCommonParamter<E: Engine> {
+pub struct UnCommonParamter<E>
+where
+    E: Engine,
+    E::G1: WnafGroup,
+    E::G2: WnafGroup,
+{
     pub delta: ParameterPair<E>,
     pub gamma: ParameterPair<E>,
     pub ic: TauParameterPair<E>,
@@ -604,7 +712,12 @@ pub struct UnCommonParamter<E: Engine> {
     pub h: TauParameterPair<E>,
 }
 #[derive(Debug, Clone)]
-pub struct UnCommonParamterInStorage<E: Engine> {
+pub struct UnCommonParamterInStorage<E>
+where
+    E: Engine,
+    E::G1: WnafGroup,
+    E::G2: WnafGroup,
+{
     pub alpha_g1: E::G1Affine,
     /*pub alpha_g2: E::G2Affine,
     pub beta_g1: E::G1Affine,
@@ -629,10 +742,16 @@ impl<E: Engine> UnCommonParamtersMap<E> {
     }
 }*/
 
-pub struct CommonParamterMatrix<E: Engine> {
-    pub tau_matrix: (Vec<E::G1>, Vec<E::G2>),
-    pub alpha_mul_tau_matrix: (Vec<E::G1>, Vec<E::G2>),
-    pub beta_mul_tau_matrix: (Vec<E::G1>, Vec<E::G2>),
+pub struct CommonParamterMatrix<E>
+where
+    E: Engine,
+    E::G1: WnafGroup,
+    E::G2: WnafGroup,
+{
+    pub matrixed_g1_front: E::G1,
+    pub matrixed_g2_front: E::G2,
+    pub matrixed_g1_back: E::G1,
+    pub matrixed_g2_back: E::G2,
 }
 
 //要传给进行非通用计算的用户使用公共计算产生的参数和电路产生的矩阵运算非通用计算参数
