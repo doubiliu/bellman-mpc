@@ -413,7 +413,7 @@ where
     pub beta_mul_tau_g2: Vec<E::G2>,
 }
 
-fn list_mul_matrix<E>(
+pub fn list_mul_matrix<E>(
     list_g1: &Vec<E::G1>,
     list_g2: &Vec<E::G2>,
     matrix: &Vec<Vec<(E::Fr, usize)>>,
@@ -429,6 +429,9 @@ where
     let mut result_g1 = Vec::new();
     let mut result_g2 = Vec::new();
     for i in 0..matrix.len() {
+        if matrix[i].len() == 0 {
+            break;
+        }
         for j in 0..len {
             if i == 0 {
                 result_g1.push(list_g1[j] * matrix[i][j].0);

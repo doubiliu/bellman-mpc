@@ -67,11 +67,34 @@ mod mpc_tests {
         assert_eq!(beta_mul_tau_g2[2], g2 * Scalar::from(216000 * 24));
         assert_eq!(beta_mul_tau_g1[3], g1 * Scalar::from(12960000 * 24));
         assert_eq!(beta_mul_tau_g2[3], g2 * Scalar::from(12960000 * 24));
-
-        //验证matrix
-        //let at_aux = vec![];
     }
 
     #[test]
-    fn matrix_works() {}
+    fn matrix_works() {
+        let g1 = bls12_381::G1Affine::generator();
+        let g2 = bls12_381::G2Affine::generator();
+        let list_g1 = vec![g1 * Scalar::from(2), g1 * Scalar::from(4)];
+        let list_g2 = vec![g2 * Scalar::from(2), g2 * Scalar::from(4)];
+        let matrix1 = vec![
+            vec![(Scalar::from(1), 0usize), (Scalar::from(2), 1usize)],
+            vec![],
+        ];
+        let matrix2 = vec![
+            vec![(Scalar::from(1), 0usize), (Scalar::from(2), 1usize)],
+            vec![(Scalar::from(3), 0usize), (Scalar::from(4), 1usize)],
+        ];
+        let (mlist_g1, mlist_g2) = list_mul_matrix::<Bls12>(&list_g1, &list_g2, &matrix1);
+        assert_eq!(mlist_g1[0], g1 * Scalar::from(2));
+        assert_eq!(mlist_g1[1], g1 * Scalar::from(8));
+        assert_eq!(mlist_g2[0], g2 * Scalar::from(2));
+        assert_eq!(mlist_g2[1], g2 * Scalar::from(8));
+
+        let (mlist_g1, mlist_g2) = list_mul_matrix::<Bls12>(&list_g1, &list_g2, &matrix2);
+        assert_eq!(mlist_g1[0], g1 * Scalar::from(8));
+        assert_eq!(mlist_g1[1], g1 * Scalar::from(24));
+        assert_eq!(mlist_g2[0], g2 * Scalar::from(8));
+        assert_eq!(mlist_g2[1], g2 * Scalar::from(24));
+    }
+    #[test]
+    fn uncommonn_works() {}
 }
