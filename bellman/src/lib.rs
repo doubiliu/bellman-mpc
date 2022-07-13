@@ -150,6 +150,9 @@ pub mod mimc_mod;
 pub mod and;
 pub mod and_mod;
 
+pub mod gt_bytes;
+pub mod gt_utils;
+
 #[no_mangle]
 pub extern "C" fn test_bellman() {
     //mimc::test_mimc()

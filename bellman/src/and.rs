@@ -174,7 +174,7 @@ fn test_rangedemo_bls12() {
 
     let ic = pvk.ic;
 }
-
+/*
 #[test]
 pub fn test_mpc_alpha() {
     let player1 = Scalar::from(1);
@@ -252,4 +252,4 @@ pub fn test_mpc_tau() {
     assert_eq!(list[4].list[0].g1_result.unwrap(), standard[0]);
     assert_eq!(list[4].list[1].g1_result.unwrap(), standard[1]);
     assert_eq!(list[4].list[2].g1_result.unwrap(), standard[2]);
-}
+}*/
