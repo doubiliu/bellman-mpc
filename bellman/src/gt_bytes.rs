@@ -205,31 +205,42 @@ fn test_format() {
         117, 226, 228, 206, 64, 221, 175, 103, 245, 252, 165, 38, 229, 210, 150, 109, 154, 66, 34,
         31, 134, 73, 159, 126, 25,
     ];
-    let tmp: [u64; 6] = [
-        15160015403425294741u64,
-        11342496543937232509,
-        11284658528271854226,
-        17618113228161746858,
-        11631679852104167526,
-        593530325556397176,
-    ];
-    let tmp2: [u64; 12] = [
-        1833778908674098629,
-        10940135709871646008,
-        14469595491885370873,
-        14913175881451308564,
-        11966403029181413248,
-        1437568066627491877,
-        15160015403425294741,
-        11342496543937232509,
-        11284658528271854226,
-        17618113228161746858,
-        11631679852104167526,
-        593530325556397176,
-    ];
+    let g1 = G1Affine::generator();
+    let g2 = G2Affine::generator();
+    let gt = pairing(&g1, &g2);
+
     let tmp_gt = unsafe { transmute::<[u8; 576], [u64; 72]>(bytes) };
     let bytes = gt_format(&tmp_gt);
+    println!("gt:");
     for i in bytes.iter() {
-        println!("{}", i);
+        print!("{},", i);
     }
+    println!("");
+    println!("gt+gt:");
+
+    let gtplusgt = gt + gt;
+    let tmp_gt = unsafe { transmute::<Gt, [u64; 72]>(gtplusgt) };
+    let bytes = gt_format(&tmp_gt);
+    for i in bytes.iter() {
+        print!("{},", i);
+    }
+    println!("");
+
+    println!("gt*3:");
+
+    let gtmul3 = gt * Scalar::from(3);
+    let tmp_gt = unsafe { transmute::<Gt, [u64; 72]>(gtmul3) };
+    let bytes = gt_format(&tmp_gt);
+    for i in bytes.iter() {
+        print!("{},", i);
+    }
+    println!("");
+    println!("gt*-3:");
+
+    let tmp_gt = unsafe { transmute::<Gt, [u64; 72]>(-gtmul3) };
+    let bytes = gt_format(&tmp_gt);
+    for i in bytes.iter() {
+        print!("{},", i);
+    }
+    println!("");
 }

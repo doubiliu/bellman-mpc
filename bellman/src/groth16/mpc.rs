@@ -355,15 +355,7 @@ where
 }
 //---------------------------------------------------------------------------------------------------------------------//
 
-
-
-
-
 //---------------------------------------------------------------------------------------------------------------------//
-
-
-
-
 
 //---------------------------------------------------------------------------------------------------------------------//
 //公共计算产生的参数，要传给进行非通用计算的用户
@@ -541,6 +533,7 @@ where
 }
 
 pub fn make_new_tau_paramter<E>(
+    a: &u64,
     x: &u64,
     pointg1_list: &Vec<E::G1>,
     pointg2_list: &Vec<E::G2>,
@@ -557,7 +550,7 @@ where
     assert_eq!(pointg1_list.len(), pointg1_list.len());
     for i in 0..pointg1_list.len() {
         list.push(make_new_paramter(
-            x,
+            &(x.pow(i as u32 + 1) * a),
             &pointg1_list[i],
             &pointg2_list[i],
             &base_g1,
@@ -568,15 +561,26 @@ where
     TauParameterPair { list }
 }
 
-pub fn initial_common_paramters<E>() -> CommonParamterInStorage<E>
+pub fn initial_common_paramters<E>(len: usize) -> CommonParamterInStorage<E>
 where
     E: Engine,
     E::G1: WnafGroup,
     E::G2: WnafGroup,
 {
-    let len = 0;
-    let init_paramters = 0;
-    unimplemented!()
+    let g1 = E::G1::generator();
+    let g2 = E::G2::generator();
+    CommonParamterInStorage {
+        alpha_g1: g1,
+        alpha_g2: g2,
+        beta_g1: g1,
+        beta_g2: g2,
+        tau_g1: vec![g1; len],
+        tau_g2: vec![g2; len],
+        alpha_mul_tau_g1: vec![g1; len],
+        alpha_mul_tau_g2: vec![g2; len],
+        beta_mul_tau_g1: vec![g1; len],
+        beta_mul_tau_g2: vec![g2; len],
+    }
 }
 
 pub fn mpc_common_paramters_generator<E>(
@@ -605,11 +609,13 @@ where
         make_new_paramter::<E>(&beta, &storage.beta_g1, &storage.beta_g2, &g1, &g2, false);
 
     //从common里拿出x数据，计算本次x[]
-    let new_tau = make_new_tau_paramter::<E>(&tau, &storage.tau_g1, &storage.tau_g2, false);
+    let new_tau = make_new_tau_paramter::<E>(&1, &tau, &storage.tau_g1, &storage.tau_g2, false);
 
     //计算alpha*x[]
     let new_alpha_mul_tau = make_new_tau_paramter::<E>(
-        &(alpha * tau),
+        //&(alpha * tau),
+        &alpha,
+        &tau,
         &storage.alpha_mul_tau_g1,
         &storage.alpha_mul_tau_g2,
         false,
@@ -617,7 +623,9 @@ where
     //计算beta*x[]
 
     let new_beta_mul_tau = make_new_tau_paramter::<E>(
-        &(beta * tau),
+        //&(beta * tau),
+        &beta,
+        &tau,
         &storage.beta_mul_tau_g1,
         &storage.beta_mul_tau_g2,
         false,
@@ -716,7 +724,7 @@ where
     E::G2: WnafGroup,
 {
     //on-chain
-    let mut paramter_in_storage = initial_common_paramters::<E>();
+    let mut paramter_in_storage = initial_common_paramters::<E>(4);
     //under-chain
     let player1_common = mpc_common_paramters_generator(&paramter_in_storage, (1, 2, 3));
     //on-chain
@@ -887,12 +895,12 @@ where
     );
 
     //从uncommon里拿出Kin数据，计算本次Kin
-    let new_kin = make_new_tau_paramter::<E>(&gamma, &storage.kin_g1, &storage.kin_g2, true);
+    let new_kin = make_new_tau_paramter::<E>(&1, &gamma, &storage.kin_g1, &storage.kin_g2, true);
 
     //从uncommon里拿出Kin数据，计算本次Kin
-    let new_kout = make_new_tau_paramter::<E>(&delta, &storage.kout_g1, &storage.kout_g2, true);
+    let new_kout = make_new_tau_paramter::<E>(&1, &delta, &storage.kout_g1, &storage.kout_g2, true);
 
-    let new_h = make_new_tau_paramter::<E>(&delta, &storage.h_g1, &storage.h_g2, true);
+    let new_h = make_new_tau_paramter::<E>(&1, &delta, &storage.h_g1, &storage.h_g2, true);
 
     UnCommonParamter {
         gamma: new_gamma,
@@ -969,12 +977,3 @@ where
 
     new_paramter.to_storage_format()
 }
-
-
-
-
-
-
-
-
-

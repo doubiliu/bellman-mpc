@@ -19,6 +19,7 @@ mod generator;
 pub mod mpc;
 mod prover;
 mod verifier;
+mod mpc_test;
 
 pub use self::generator::*;
 pub use self::prover::*;
