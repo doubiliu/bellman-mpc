@@ -552,6 +552,8 @@ where
     let mut list: Vec<ParameterPair<E>> = Vec::new();
     assert_eq!(pointg1_list.len(), pointg1_list.len());
     for i in 0..pointg1_list.len() {
+        //let t = x.pow(i as u32 + 1) * a;
+        //println!("系数:{}  是否是反的:{}", t,invert);
         list.push(make_new_paramter(
             &(x.pow(i as u32 + 1) * a),
             &pointg1_list[i],
@@ -798,7 +800,7 @@ where
     pub h_g1: Vec<E::G1>,
     pub h_g2: Vec<E::G2>,
 }
-
+#[derive(Debug, Clone)]
 pub struct CommonParamterMatrix<E>
 where
     E: Engine,
@@ -861,9 +863,20 @@ where
     E::G1: WnafGroup,
     E::G2: WnafGroup,
 {
-    let len = 0;
-    let init_paramters = 0;
-    unimplemented!()
+    let g1 = E::G1::generator();
+    let g2 = E::G2::generator();
+    UnCommonParamterInStorage {
+        gamma_g1: g1,
+        gamma_g2: g2,
+        delta_g1: g1,
+        delta_g2: g2,
+        kin_g1: common_paramter_matrix.clone().matrixed_g1_front,
+        kin_g2: common_paramter_matrix.clone().matrixed_g2_front,
+        kout_g1: common_paramter_matrix.clone().matrixed_g1_back,
+        kout_g2: common_paramter_matrix.clone().matrixed_g2_back,
+        h_g1: common_paramter_matrix.clone().matrixed_h_g1,
+        h_g2: common_paramter_matrix.clone().matrixed_h_g2,
+    }
 }
 
 pub fn mpc_uncommon_paramters_generator<E>(
@@ -891,19 +904,19 @@ where
     let new_gamma = make_new_paramter::<E>(
         &gamma,
         &storage.gamma_g1,
-        &storage.delta_g2,
+        &storage.gamma_g2,
         &g1,
         &g2,
         false,
     );
 
     //从uncommon里拿出Kin数据，计算本次Kin
-    let new_kin = make_new_tau_paramter::<E>(&1, &gamma, &storage.kin_g1, &storage.kin_g2, true);
+    let new_kin = make_new_tau_paramter::<E>(&gamma, &1, &storage.kin_g1, &storage.kin_g2, true);
 
     //从uncommon里拿出Kin数据，计算本次Kin
-    let new_kout = make_new_tau_paramter::<E>(&1, &delta, &storage.kout_g1, &storage.kout_g2, true);
+    let new_kout = make_new_tau_paramter::<E>(&delta, &1, &storage.kout_g1, &storage.kout_g2, true);
 
-    let new_h = make_new_tau_paramter::<E>(&1, &delta, &storage.h_g1, &storage.h_g2, true);
+    let new_h = make_new_tau_paramter::<E>(&delta, &1, &storage.h_g1, &storage.h_g2, true);
 
     UnCommonParamter {
         gamma: new_gamma,
@@ -956,19 +969,20 @@ where
                 &new_paramter.l.list[i].g1_result.unwrap().to_affine(),
                 &new_paramter.delta.g2_result.unwrap().to_affine(),
             ) == E::pairing(
-                &common_paramter_matrix.matrixed_g1_front[i].to_affine(),
+                &common_paramter_matrix.matrixed_g1_back[i].to_affine(),
                 &E::G2Affine::generator(),
             );
     }
 
     //验证h正确性
     for i in 0..storage.h_g1.len() {
-        result_kin = result_kin
+        assert_eq!(result_h, true);
+        result_h = result_h
             && E::pairing(
                 &new_paramter.h.list[i].g1_result.unwrap().to_affine(),
                 &new_paramter.delta.g2_result.unwrap().to_affine(),
             ) == E::pairing(
-                &common_paramter_matrix.matrixed_g1_front[i].to_affine(),
+                &common_paramter_matrix.matrixed_h_g1[i].to_affine(),
                 &E::G2Affine::generator(),
             );
     }
