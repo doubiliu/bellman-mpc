@@ -31,11 +31,11 @@ where
 {
     let g1 = E::G1::generator();
     let g2 = E::G2::generator();
-    let alpha = E::Fr::from(2);
-    let beta = E::Fr::from(3);
-    let gamma = E::Fr::from(4);
-    let delta = E::Fr::from(1);
-    let tau = E::Fr::from(2);
+    let alpha = E::Fr::from(6);
+    let beta = E::Fr::from(24);
+    let gamma = E::Fr::from(6);
+    let delta = E::Fr::from(24);
+    let tau = E::Fr::from(60);
     generate_parameters::<E, C>(circuit, g1, g2, alpha, beta, gamma, delta, tau)
 }
 
@@ -281,10 +281,17 @@ where
     // Create bases for blind evaluation of polynomials at tau
     let powers_of_tau = vec![Scalar::<E::Fr>(E::Fr::zero()); assembly.num_constraints];
     let mut powers_of_tau = EvaluationDomain::from_coeffs(powers_of_tau)?;
+    let cp = mpc_common_paramters_custom_all::<E>();
+    let cp_m = cp.matrix(
+        &assembly.at_aux,
+        &assembly.bt_aux,
+        &assembly.ct_aux,
+        assembly.num_inputs,
+        assembly.num_aux,
+        assembly.num_constraints,
+    );
+    let ucp = mpc_uncommon_paramters_custom_all::<E>(&cp_m);
 
-    println!("at_aux: {:?}", assembly.at_aux);
-    println!("bt_aux: {:?}", assembly.bt_aux);
-    println!("ct_aux: {:?}", assembly.ct_aux);
     // Compute G1 window table
     let mut g1_wnaf = Wnaf::new();
     let g1_wnaf = g1_wnaf.base(g1, {
@@ -342,7 +349,6 @@ where
                 }
             });
         }
-
         // coeff = t(x) / delta
         let mut coeff = powers_of_tau.z(&tau);
         coeff.mul_assign(&delta_inverse);
@@ -375,7 +381,6 @@ where
             }
         });
     }
-
     // Use inverse FFT to convert powers of tau to Lagrange coefficients
     powers_of_tau.ifft(&worker);
     let powers_of_tau = powers_of_tau.into_coeffs();
@@ -548,10 +553,10 @@ where
             return Err(SynthesisError::UnconstrainedVariable);
         }
     }
-
+    assert_eq!(h[0], ucp.h_g1[0].to_affine());
+    assert_eq!(h[1], ucp.h_g1[1].to_affine());
     let g1 = g1.to_affine();
     let g2 = g2.to_affine();
-
     let vk = VerifyingKey::<E> {
         alpha_g1: (g1 * alpha).to_affine(),
         beta_g1: (g1 * beta).to_affine(),
@@ -561,6 +566,13 @@ where
         delta_g2: (g2 * delta).to_affine(),
         ic,
     };
+    //检查vk
+    assert_eq!(vk.alpha_g1, cp.alpha_g1.to_affine());
+    assert_eq!(vk.beta_g1, cp.beta_g1.to_affine());
+    assert_eq!(vk.beta_g2, cp.beta_g2.to_affine());
+    assert_eq!(vk.gamma_g2, ucp.gamma_g2.to_affine());
+    assert_eq!(vk.delta_g1, ucp.delta_g1.to_affine());
+    assert_eq!(vk.delta_g2, ucp.delta_g2.to_affine());
 
     Ok(Parameters {
         vk,

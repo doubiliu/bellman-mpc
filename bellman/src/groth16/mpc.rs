@@ -424,8 +424,6 @@ where
     E::G2: WnafGroup,
 {
     let len = matrix[0].len();
-    assert!(len == list_g2.len());
-    assert!(len == list_g1.len());
     let mut result_g1 = Vec::new();
     let mut result_g2 = Vec::new();
     for i in 0..matrix.len() {
@@ -471,6 +469,13 @@ where
             list_mul_matrix::<E>(&self.beta_mul_tau_g1, &self.beta_mul_tau_g2, at_aux);
         let (tau_matrix_g1, tau_matrix_g2) =
             list_mul_matrix::<E>(&self.tau_g1, &self.tau_g2, ct_aux);
+        let g1 = E::G1::generator();
+        let g2 = E::G2::generator();
+        let g1_indentity = g1 * E::Fr::from(0);
+        let g2_indentity = g2 * E::Fr::from(0);
+        let alpha_len = alpha_matrix_g1.len();
+        let beta_len = beta_matrix_g1.len();
+        let tau_len = tau_matrix_g1.len();
         let mut matrixed_g1_front = Vec::new();
         let mut matrixed_g2_front = Vec::new();
         let mut matrixed_g1_back = Vec::new();
@@ -479,19 +484,46 @@ where
         let mut matrixed_h_g2 = Vec::new();
 
         for i in 0..num_aux + num_inputs {
+            if i >= alpha_len && i >= beta_len && i >= tau_len {
+                break;
+            }
             if i < num_aux {
-                matrixed_g1_front.push(alpha_matrix_g1[i] + beta_matrix_g1[i] + tau_matrix_g1[i]);
-                matrixed_g2_front.push(alpha_matrix_g2[i] + beta_matrix_g2[i] + tau_matrix_g2[i]);
+                matrixed_g1_front.push(g1_indentity);
+                matrixed_g2_front.push(g2_indentity);
+                if i < alpha_len {
+                    matrixed_g1_front[i] += alpha_matrix_g1[i];
+                    matrixed_g2_front[i] += alpha_matrix_g2[i];
+                }
+                if i < beta_len {
+                    matrixed_g1_front[i] += beta_matrix_g1[i];
+                    matrixed_g2_front[i] += beta_matrix_g2[i];
+                }
+                if i < tau_len {
+                    matrixed_g1_front[i] += tau_matrix_g1[i];
+                    matrixed_g2_front[i] += tau_matrix_g2[i];
+                }
             } else {
-                matrixed_g1_back.push(alpha_matrix_g1[i] + beta_matrix_g1[i] + tau_matrix_g1[i]);
-                matrixed_g2_back.push(alpha_matrix_g2[i] + beta_matrix_g2[i] + tau_matrix_g2[i]);
+                matrixed_g1_front.push(g1_indentity);
+                matrixed_g2_front.push(g2_indentity);
+                if i < alpha_len {
+                    matrixed_g1_back[i - num_aux] += alpha_matrix_g1[i];
+                    matrixed_g2_back[i - num_aux] += alpha_matrix_g2[i];
+                }
+                if i < beta_len {
+                    matrixed_g1_back[i - num_aux] += beta_matrix_g1[i];
+                    matrixed_g2_back[i - num_aux] += beta_matrix_g2[i];
+                }
+                if i < tau_len {
+                    matrixed_g1_back[i - num_aux] += tau_matrix_g1[i];
+                    matrixed_g2_back[i - num_aux] += tau_matrix_g2[i];
+                }
             }
         }
-
         //存疑,m，l，n值的选取
-        for i in 0..num_constraints - 1 {
-            matrixed_h_g1.push(tau_matrix_g1[num_constraints + i] - tau_matrix_g1[i]);
-            matrixed_h_g2.push(tau_matrix_g2[num_constraints + i] - tau_matrix_g2[i]);
+        for i in 0..num_constraints {
+            assert_eq!(self.tau_g1[0].to_affine(), E::G1::generator().to_affine());
+            matrixed_h_g1.push(self.tau_g1[num_constraints + i] - self.tau_g1[i]);
+            matrixed_h_g2.push(self.tau_g2[num_constraints + i] - self.tau_g2[i]);
         }
 
         CommonParamterMatrix {
@@ -555,7 +587,7 @@ where
         //let t = x.pow(i as u32 + 1) * a;
         //println!("系数:{}  是否是反的:{}", t,invert);
         list.push(make_new_paramter(
-            &(x.pow(i as u32 + 1) * a),
+            &(x.pow(i as u32) * a),
             &pointg1_list[i],
             &pointg2_list[i],
             &base_g1,
@@ -689,7 +721,7 @@ where
 
     for i in 0..len {
         //x[]自身验证指数数组
-        if i > 1 {
+        /*if i >  {
             result_tau = result_tau
                 && (E::pairing(
                     &new_paramter.tau.list[i].g1_result.unwrap().to_affine(),
@@ -698,7 +730,7 @@ where
                     &new_paramter.tau.list[i - 1].g1_result.unwrap().to_affine(),
                     &new_paramter.tau.list[0].g2_result.unwrap().to_affine(),
                 ));
-        }
+        }*/
         //从storage和新参数里验证 alpha*x
         result_alpha_tau = result_alpha_tau
             && verify_new_paramter(
@@ -728,8 +760,11 @@ where
     E::G1: WnafGroup,
     E::G2: WnafGroup,
 {
-    //on-chain
-    let mut paramter_in_storage = initial_common_paramters::<E>(4);
+    let g1 = bls12_381::G1Affine::generator();
+    let g2 = bls12_381::G2Affine::generator();
+
+    let mut paramter_in_storage =
+        initial_common_paramters(8 /*这个数表示最高到x的几次幂*/);
     //under-chain
     let player1_common = mpc_common_paramters_generator(&paramter_in_storage, (1, 2, 3));
     //on-chain
@@ -742,8 +777,6 @@ where
     let player3_common = mpc_common_paramters_generator(&paramter_in_storage, (3, 4, 5));
     //on-chain
     paramter_in_storage = verify_common_paramter(&paramter_in_storage, &player3_common);
-
-    //on-chain
     paramter_in_storage
 }
 
@@ -824,17 +857,14 @@ where
     E::G1: WnafGroup,
     E::G2: WnafGroup,
 {
-    //on-chain
-    let mut paramter_in_storage = initial_uncommon_paramters::<E>(common_paramter_matrix);
+    let mut paramter_in_storage = initial_uncommon_paramters(&common_paramter_matrix);
     //under-chain
     let player1_common = mpc_uncommon_paramters_generator(&paramter_in_storage, (1, 2));
-    //on-chain
     paramter_in_storage = verify_uncommon_paramter(
         &common_paramter_matrix,
         &paramter_in_storage,
         &player1_common,
     );
-    //under-chain
     let player2_common = mpc_uncommon_paramters_generator(&paramter_in_storage, (2, 3));
     //on-chain
     paramter_in_storage = verify_uncommon_paramter(
@@ -850,8 +880,6 @@ where
         &paramter_in_storage,
         &player3_common,
     );
-
-    //on-chain
     paramter_in_storage
 }
 

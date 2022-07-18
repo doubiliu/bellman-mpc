@@ -4,6 +4,82 @@ mod mpc_tests {
 
     use crate::groth16::mpc::*;
     use bls12_381::{Bls12, Scalar};
+
+    #[test]
+    fn all_test() {
+        let g1 = bls12_381::G1Affine::generator();
+        let g2 = bls12_381::G2Affine::generator();
+        let mut paramter_in_storage =
+            initial_common_paramters::<Bls12>(8 /*这个数表示最高到x的几次幂*/);
+        //under-chain
+        let player1_common = mpc_common_paramters_generator(&paramter_in_storage, (1, 2, 3));
+        //on-chain
+        paramter_in_storage = verify_common_paramter(&paramter_in_storage, &player1_common);
+        //under-chain
+        let player2_common = mpc_common_paramters_generator(&paramter_in_storage, (2, 3, 4));
+        //on-chain
+        paramter_in_storage = verify_common_paramter(&paramter_in_storage, &player2_common);
+        //under-chain
+        let player3_common = mpc_common_paramters_generator(&paramter_in_storage, (3, 4, 5));
+        //on-chain
+        paramter_in_storage = verify_common_paramter(&paramter_in_storage, &player3_common);
+
+        let at_aux = vec![
+            vec![(Scalar::from(1), 0usize), (Scalar::from(2), 1usize)],
+            vec![],
+        ];
+        let bt_aux = vec![
+            vec![(Scalar::from(1), 0usize), (Scalar::from(2), 1usize)],
+            vec![(Scalar::from(3), 0usize), (Scalar::from(4), 1usize)],
+        ];
+        let ct_aux = vec![vec![], vec![]];
+
+        let common_paramter_matrix = paramter_in_storage.matrix(&at_aux, &bt_aux, &ct_aux, 2, 2, 4);
+        let mut paramter_in_storage = initial_uncommon_paramters::<Bls12>(&common_paramter_matrix);
+        //under-chain
+        let player1_common = mpc_uncommon_paramters_generator(&paramter_in_storage, (1, 2));
+        paramter_in_storage = verify_uncommon_paramter(
+            &common_paramter_matrix,
+            &paramter_in_storage,
+            &player1_common,
+        );
+        let player2_common = mpc_uncommon_paramters_generator(&paramter_in_storage, (2, 3));
+        //on-chain
+        paramter_in_storage = verify_uncommon_paramter(
+            &common_paramter_matrix,
+            &paramter_in_storage,
+            &player2_common,
+        );
+        //under-chain
+        let player3_common = mpc_uncommon_paramters_generator(&paramter_in_storage, (3, 4));
+        //on-chain
+        paramter_in_storage = verify_uncommon_paramter(
+            &common_paramter_matrix,
+            &paramter_in_storage,
+            &player3_common,
+        );
+    }
+    #[test]
+    fn test_h() {
+        let g1 = bls12_381::G1Affine::generator();
+        let x = 60u64;
+        for i in 1..5 {
+            print!("pow = {}", i);
+            let x_t = x.pow(i);
+            let t = Scalar::from(x_t - x);
+            let g1 = g1 * t;
+            let invert = Scalar::from(24).invert().unwrap();
+            let g1 = g1 * invert;
+            println!("g1: {:?}", bls12_381::G1Affine::from(g1));
+        }
+        /*for i in 0..100 {
+            print!("i = {} ",i);
+            let g1 = g1 * Scalar::from(i);
+            let invert = Scalar::from(24).invert().unwrap();
+            let g1 = g1 * invert;
+        }*/
+    }
+
     #[test]
     fn common_works() {
         //验证通用系数
@@ -121,15 +197,6 @@ mod mpc_tests {
         let mut paramter_in_storage = initial_uncommon_paramters::<Bls12>(&common_paramter_matrix);
         //under-chain
         let player1_common = mpc_uncommon_paramters_generator(&paramter_in_storage, (1, 2));
-        assert_eq!(
-            player1_common.gamma.g2_result.unwrap(),
-            g2 * Scalar::from(1)
-        );
-        assert_eq!(player1_common.delta.g2_mine.unwrap(), g2 * Scalar::from(2));
-        assert_eq!(
-            player1_common.delta.g2_result.unwrap(),
-            g2 * Scalar::from(2)
-        );
         //on-chain
         paramter_in_storage = verify_uncommon_paramter(
             &common_paramter_matrix,

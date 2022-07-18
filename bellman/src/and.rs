@@ -25,13 +25,6 @@ use crate::groth16::{
 
 #[test]
 fn test_anddemo_bls12() {
-    let g1 = Scalar::one();
-    let g2 = Scalar::one();
-    let alpha = Scalar::from(48577);
-    let beta = Scalar::from(22580);
-    let gamma = Scalar::from(53332);
-    let delta = Scalar::from(5481);
-    let tau = Scalar::from(3673);
     let mut rng = thread_rng();
     let params = {
         let c = AndDemo {
@@ -68,11 +61,11 @@ fn test_anddemo_bls12() {
 
     let proof_c = proof.c.to_uncompressed();
 
-    println!("A Point: {:?}", proof_a);
+    //println!("A Point: {:?}", proof_a);
 
-    println!("B Point: {:?}", proof_b);
+    //println!("B Point: {:?}", proof_b);
 
-    println!("C Point: {:?}", proof_c);
+    //println!("C Point: {:?}", proof_c);
 
     let vk = params.vk;
 
@@ -84,13 +77,13 @@ fn test_anddemo_bls12() {
 
     let delta_g2 = vk.delta_g2.to_uncompressed();
 
-    println!("alpha_g1 Point: {:?}", alpha_g1);
+    //println!("alpha_g1 Point: {:?}", alpha_g1);
 
-    println!("beta_g2 Point: {:?}", beta_g2);
+    //println!("beta_g2 Point: {:?}", beta_g2);
 
-    println!("gamma_g2 Point: {:?}", gamma_g2);
+    //println!("gamma_g2 Point: {:?}", gamma_g2);
 
-    println!("delta_g2 Point: {:?}", delta_g2);
+    //println!("delta_g2 Point: {:?}", delta_g2);
 
     let mut acc = pvk.ic[0].to_uncompressed();
 
@@ -98,11 +91,11 @@ fn test_anddemo_bls12() {
 
     let ic1 = pvk.ic[1].to_uncompressed();
 
-    println!("ic0 Point: {:?}", acc);
+    //println!("ic0 Point: {:?}", acc);
 
-    println!("ic1 Point: {:?}", ic1);
+    //println!("ic1 Point: {:?}", ic1);
 
-    println!("ic len: {:?}", pvkiclen);
+    //println!("ic len: {:?}", pvkiclen);
 }
 #[test]
 fn test_rangedemo_bls12() {
