@@ -76,7 +76,6 @@ impl<Scalar: PrimeField> Circuit<Scalar> for AndDemo<Scalar> {
 */
 impl<Scalar: PrimeField> Circuit<Scalar> for AndDemo<Scalar> {
     fn synthesize<CS: ConstraintSystem<Scalar>>(self, cs: &mut CS) -> Result<(), SynthesisError> {
-        print!("a:{:?}  , b:{:?}  ", self.a, self.b);
         let a_var = cs.alloc(
             || "a",
             || {
@@ -91,14 +90,12 @@ impl<Scalar: PrimeField> Circuit<Scalar> for AndDemo<Scalar> {
                 }
             },
         )?;
-
         let x = cs.enforce(
             || "a_boolean_constraint",
             |lc| lc + CS::one() - a_var,
             |lc| lc + a_var,
             |lc| lc,
         );
-
         let b_var = cs.alloc(
             || "b",
             || {
@@ -127,7 +124,6 @@ impl<Scalar: PrimeField> Circuit<Scalar> for AndDemo<Scalar> {
                 }
             },
         )?;
-        let v3 = Variable(Index::Aux(2));
         let lc3 = LinearCombination::<Scalar>::zero() + c_var;
         let lc1 = LinearCombination::<Scalar>::zero() + a_var;
         let lc2 = LinearCombination::<Scalar>::zero() + b_var;
@@ -270,4 +266,3 @@ l
     );
     Ok(())
 }*/
-

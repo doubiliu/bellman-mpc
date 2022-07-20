@@ -414,8 +414,8 @@ where
 }
 
 pub fn list_mul_matrix<E>(
-    list_g1: &Vec<E::G1>,
-    list_g2: &Vec<E::G2>,
+    list_g1: &[E::G1],
+    list_g2: &[E::G2],
     matrix: &Vec<Vec<(E::Fr, usize)>>,
 ) -> (Vec<E::G1>, Vec<E::G2>)
 where
@@ -423,22 +423,35 @@ where
     E::G1: WnafGroup,
     E::G2: WnafGroup,
 {
-    let len = matrix[0].len();
-    let mut result_g1 = Vec::new();
-    let mut result_g2 = Vec::new();
+    let g1_indentity = E::G1::generator() * E::Fr::from(0);
+    let g2_indentity = E::G2::generator() * E::Fr::from(0);
+    let len = list_g1.len();
+    let mut result_g1 = vec![g1_indentity; len];
+    let mut result_g2 = vec![g2_indentity; len];
     for i in 0..matrix.len() {
         if matrix[i].len() == 0 {
             break;
         }
-        for j in 0..len {
-            if i == 0 {
-                result_g1.push(list_g1[j] * matrix[i][j].0);
-                result_g2.push(list_g2[j] * matrix[i][j].0);
-            } else {
-                result_g1[j] = result_g1[j] + list_g1[j] * matrix[i][j].0;
-                result_g2[j] = result_g2[j] + list_g2[j] * matrix[i][j].0;
-            }
+        /*for j in 0..matrix[i].len() {
+            result_g1[matrix[i][j].1] =
+                result_g1[matrix[i][j].1] + list_g1[matrix[i][j].1] * matrix[i][j].0;
+            result_g2[matrix[i][j].1] =
+                result_g2[matrix[i][j].1] + list_g2[matrix[i][j].1] * matrix[i][j].0;
+        }*/
+
+        for j in 0..matrix[i].len() {
+            result_g1[i] = result_g1[i] + list_g1[matrix[i][j].1] * matrix[i][j].0;
+            result_g2[i] = result_g2[i] + list_g2[matrix[i][j].1] * matrix[i][j].0;
         }
+
+        /*
+        for j in 0..len {
+            result_g1[matrix[i][j].1] =
+                result_g1[matrix[i][j].1] + list_g1[matrix[i][j].1] * matrix[i][j].0;
+            result_g2[matrix[i][j].1] =
+                result_g2[matrix[i][j].1] + list_g2[matrix[i][j].1] * matrix[i][j].0;
+            //}
+        }*/
     }
     (result_g1, result_g2)
 }
@@ -449,6 +462,98 @@ where
     E::G1: WnafGroup,
     E::G2: WnafGroup,
 {
+    //matrix需要改，tau列表长度一定大于num_aux和num_inputs的列数，这时候怎么乘
+    pub fn matrix_test(
+        &self,
+        at_aux: &Vec<Vec<(E::Fr, usize)>>,
+        bt_aux: &Vec<Vec<(E::Fr, usize)>>,
+        ct_aux: &Vec<Vec<(E::Fr, usize)>>,
+        num_inputs: usize,
+        num_aux: usize,
+        num_constraints: usize,
+    ) -> CommonParamterMatrix<E>
+    where
+        E: Engine,
+        E::G1: WnafGroup,
+        E::G2: WnafGroup,
+    {
+        let g1 = E::G1::generator();
+        let g2 = E::G2::generator();
+        let g1_indentity = g1 * E::Fr::from(0);
+        let g2_indentity = g2 * E::Fr::from(0);
+        let (alpha_matrix_g1_front, alpha_matrix_g2_front) = list_mul_matrix::<E>(
+            &self.alpha_mul_tau_g1[0..num_aux],
+            &self.alpha_mul_tau_g2[0..num_aux],
+            bt_aux,
+        );
+        //assert_eq!(alpha_matrix_g1_front[0], g1 * E::Fr::from(6));
+        //assert_eq!(alpha_matrix_g1_front[1], g1 * E::Fr::from(6 * 60));
+        let (alpha_matrix_g1_back, alpha_matrix_g2_back) = list_mul_matrix::<E>(
+            &self.alpha_mul_tau_g1[num_aux..num_inputs + num_aux],
+            &self.alpha_mul_tau_g2[num_aux..num_inputs + num_aux],
+            bt_aux,
+        );
+
+        let (beta_matrix_g1_front, beta_matrix_g2_front) = list_mul_matrix::<E>(
+            &self.beta_mul_tau_g1[0..num_aux],
+            &self.beta_mul_tau_g2[0..num_aux],
+            at_aux,
+        );
+        /*assert_eq!(self.beta_mul_tau_g1[0], g1 * E::Fr::from(24));
+        assert_eq!(self.beta_mul_tau_g1[1], g1 * E::Fr::from(24 * 60));
+
+        assert_eq!(beta_matrix_g1_front[0], g1 * E::Fr::from(24 * 61));
+        assert_eq!(beta_matrix_g1_front[1], g1 * E::Fr::from(0));*/
+
+        let (beta_matrix_g1_back, beta_matrix_g2_back) = list_mul_matrix::<E>(
+            &self.beta_mul_tau_g1[num_aux..num_inputs + num_aux],
+            &self.beta_mul_tau_g2[num_aux..num_inputs + num_aux],
+            at_aux,
+        );
+
+        let (tau_matrix_g1_front, tau_matrix_g2_front) =
+            list_mul_matrix::<E>(&self.tau_g1[0..num_aux], &self.tau_g2[0..num_aux], ct_aux);
+        let (tau_matrix_g1_back, tau_matrix_g2_back) = list_mul_matrix::<E>(
+            &self.tau_g1[num_aux..num_inputs + num_aux],
+            &self.tau_g2[num_aux..num_inputs + num_aux],
+            ct_aux,
+        );
+        let mut matrixed_g1_front = vec![g1_indentity; num_aux];
+        let mut matrixed_g2_front = vec![g2_indentity; num_aux];
+        let mut matrixed_g1_back = vec![g1_indentity; num_inputs];
+        let mut matrixed_g2_back = vec![g2_indentity; num_inputs];
+        let mut matrixed_h_g1 = vec![g1_indentity; num_constraints];
+        let mut matrixed_h_g2 = vec![g2_indentity; num_constraints];
+        for i in 0..num_aux {
+            matrixed_g1_front[i] +=
+                alpha_matrix_g1_front[i] + beta_matrix_g1_front[i] + tau_matrix_g1_front[i];
+            matrixed_g2_front[i] +=
+                alpha_matrix_g2_front[i] + beta_matrix_g2_front[i] + tau_matrix_g2_front[i];
+        }
+
+        for i in 0..num_inputs {
+            matrixed_g1_back[i] +=
+                alpha_matrix_g1_back[i] + beta_matrix_g1_back[i] + tau_matrix_g1_back[i];
+            matrixed_g2_back[i] +=
+                alpha_matrix_g2_back[i] + beta_matrix_g2_back[i] + tau_matrix_g2_back[i];
+        }
+        //存疑,m，l，n值的选取
+        for i in 0..num_constraints {
+            assert_eq!(self.tau_g1[0].to_affine(), E::G1::generator().to_affine());
+            matrixed_h_g1[i] = self.tau_g1[num_constraints + i] - self.tau_g1[i];
+            matrixed_h_g2[i] = self.tau_g2[num_constraints + i] - self.tau_g2[i];
+        }
+        CommonParamterMatrix {
+            matrixed_g1_front,
+            matrixed_g2_front,
+            matrixed_g1_back,
+            matrixed_g2_back,
+            matrixed_h_g1,
+            matrixed_h_g2,
+        }
+    }
+
+    //matrix需要改，tau列表长度一定大于num_aux和num_inputs的列数，这时候怎么乘
     pub fn matrix(
         &self,
         at_aux: &Vec<Vec<(E::Fr, usize)>>,
@@ -463,10 +568,16 @@ where
         E::G1: WnafGroup,
         E::G2: WnafGroup,
     {
-        let (alpha_matrix_g1, alpha_matrix_g2) =
-            list_mul_matrix::<E>(&self.alpha_mul_tau_g1, &self.alpha_mul_tau_g2, bt_aux);
-        let (beta_matrix_g1, beta_matrix_g2) =
-            list_mul_matrix::<E>(&self.beta_mul_tau_g1, &self.beta_mul_tau_g2, at_aux);
+        let (alpha_matrix_g1, alpha_matrix_g2) = list_mul_matrix::<E>(
+            &self.alpha_mul_tau_g1[0..num_aux],
+            &self.alpha_mul_tau_g2[0..num_aux],
+            bt_aux,
+        );
+        let (beta_matrix_g1, beta_matrix_g2) = list_mul_matrix::<E>(
+            &self.beta_mul_tau_g1[num_aux..num_inputs + num_aux],
+            &self.beta_mul_tau_g2[num_aux..num_inputs + num_aux],
+            at_aux,
+        );
         let (tau_matrix_g1, tau_matrix_g2) =
             list_mul_matrix::<E>(&self.tau_g1, &self.tau_g2, ct_aux);
         let g1 = E::G1::generator();
@@ -484,9 +595,6 @@ where
         let mut matrixed_h_g2 = Vec::new();
 
         for i in 0..num_aux + num_inputs {
-            if i >= alpha_len && i >= beta_len && i >= tau_len {
-                break;
-            }
             if i < num_aux {
                 matrixed_g1_front.push(g1_indentity);
                 matrixed_g2_front.push(g2_indentity);
@@ -503,8 +611,8 @@ where
                     matrixed_g2_front[i] += tau_matrix_g2[i];
                 }
             } else {
-                matrixed_g1_front.push(g1_indentity);
-                matrixed_g2_front.push(g2_indentity);
+                matrixed_g1_back.push(g1_indentity);
+                matrixed_g2_back.push(g2_indentity);
                 if i < alpha_len {
                     matrixed_g1_back[i - num_aux] += alpha_matrix_g1[i];
                     matrixed_g2_back[i - num_aux] += alpha_matrix_g2[i];
@@ -525,7 +633,6 @@ where
             matrixed_h_g1.push(self.tau_g1[num_constraints + i] - self.tau_g1[i]);
             matrixed_h_g2.push(self.tau_g2[num_constraints + i] - self.tau_g2[i]);
         }
-
         CommonParamterMatrix {
             matrixed_g1_front,
             matrixed_g2_front,
@@ -766,15 +873,15 @@ where
     let mut paramter_in_storage =
         initial_common_paramters(8 /*这个数表示最高到x的几次幂*/);
     //under-chain
-    let player1_common = mpc_common_paramters_generator(&paramter_in_storage, (1, 2, 3));
+    let player1_common = mpc_common_paramters_generator(&paramter_in_storage, (1, 2, 1));
     //on-chain
     paramter_in_storage = verify_common_paramter(&paramter_in_storage, &player1_common);
     //under-chain
-    let player2_common = mpc_common_paramters_generator(&paramter_in_storage, (2, 3, 4));
+    let player2_common = mpc_common_paramters_generator(&paramter_in_storage, (2, 3, 1));
     //on-chain
     paramter_in_storage = verify_common_paramter(&paramter_in_storage, &player2_common);
     //under-chain
-    let player3_common = mpc_common_paramters_generator(&paramter_in_storage, (3, 4, 5));
+    let player3_common = mpc_common_paramters_generator(&paramter_in_storage, (3, 4, 2));
     //on-chain
     paramter_in_storage = verify_common_paramter(&paramter_in_storage, &player3_common);
     paramter_in_storage

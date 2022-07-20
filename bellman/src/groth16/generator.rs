@@ -35,7 +35,7 @@ where
     let beta = E::Fr::from(24);
     let gamma = E::Fr::from(6);
     let delta = E::Fr::from(24);
-    let tau = E::Fr::from(60);
+    let tau = E::Fr::from(2);
     generate_parameters::<E, C>(circuit, g1, g2, alpha, beta, gamma, delta, tau)
 }
 
@@ -67,7 +67,6 @@ impl<Scalar: PrimeField> ConstraintSystem<Scalar> for KeypairAssembly<Scalar> {
 
         let index = self.num_aux;
         self.num_aux += 1;
-
         self.at_aux.push(vec![]);
         self.bt_aux.push(vec![]);
         self.ct_aux.push(vec![]);
@@ -109,6 +108,7 @@ impl<Scalar: PrimeField> ConstraintSystem<Scalar> for KeypairAssembly<Scalar> {
             this_constraint: usize,
         ) {
             for (index, coeff) in l.0 {
+                println!("这次进入的参数是：{:?}", coeff);
                 match index {
                     Variable(Index::Input(id)) => inputs[id].push((coeff, this_constraint)),
                     Variable(Index::Aux(id)) => aux[id].push((coeff, this_constraint)),
@@ -265,24 +265,38 @@ where
         bt_aux: vec![],
         ct_aux: vec![],
     };
-
     // Allocate the "one" input variable
     assembly.alloc_input(|| "", || Ok(E::Fr::one()))?;
 
     // Synthesize the circuit.
     circuit.synthesize(&mut assembly)?;
-
+    println!("没声明时");
+    println!("at_aux{:?}", assembly.at_aux);
+    println!("bt_aux{:?}", assembly.bt_aux);
+    println!("ct_aux{:?}", assembly.ct_aux);
     // Input constraints to ensure full density of IC query
     // x * 0 = 0
     for i in 0..assembly.num_inputs {
         assembly.enforce(|| "", |lc| lc + Variable(Index::Input(i)), |lc| lc, |lc| lc);
     }
+    println!("声明后");
+    println!("at_aux{:?}", assembly.at_aux);
+    println!("bt_aux{:?}", assembly.bt_aux);
+    println!("ct_aux{:?}", assembly.ct_aux);
+    println!("num_aux :{}", assembly.num_aux);
+    println!("num_input :{}", assembly.num_inputs);
+
+    {
+        let fuck = assembly.at_aux[0][0].0;
+        let alpha_front = g1 * fuck;
+    }
 
     // Create bases for blind evaluation of polynomials at tau
     let powers_of_tau = vec![Scalar::<E::Fr>(E::Fr::zero()); assembly.num_constraints];
+
     let mut powers_of_tau = EvaluationDomain::from_coeffs(powers_of_tau)?;
     let cp = mpc_common_paramters_custom_all::<E>();
-    let cp_m = cp.matrix(
+    let cp_m = cp.matrix_test(
         &assembly.at_aux,
         &assembly.bt_aux,
         &assembly.ct_aux,
@@ -290,6 +304,7 @@ where
         assembly.num_aux,
         assembly.num_constraints,
     );
+
     let ucp = mpc_uncommon_paramters_custom_all::<E>(&cp_m);
 
     // Compute G1 window table
@@ -381,9 +396,18 @@ where
             }
         });
     }
+
     // Use inverse FFT to convert powers of tau to Lagrange coefficients
     powers_of_tau.ifft(&worker);
     let powers_of_tau = powers_of_tau.into_coeffs();
+    /*let p_l = powers_of_tau.len();
+    let mut tau_list_pl_g1 = vec![E::G1Affine::identity(); p_l];
+    let mut tau_list_pl_g2 = vec![E::G2Affine::identity(); p_l];
+    for i in 0..p_l {
+        tau_list_pl_g1[i] = (E::G1Affine::generator() * powers_of_tau[i].0).to_affine();
+
+        tau_list_pl_g2[i] = (E::G2Affine::generator() * powers_of_tau[i].0).to_affine();
+    };*/
 
     let mut a = vec![E::G1Affine::identity(); assembly.num_inputs + assembly.num_aux];
     let mut b_g1 = vec![E::G1Affine::identity(); assembly.num_inputs + assembly.num_aux];
@@ -466,6 +490,7 @@ where
 
                             for &(ref coeff, index) in p {
                                 let mut n = powers_of_tau[index].0;
+
                                 n.mul_assign(coeff);
                                 acc.add_assign(&n);
                             }
@@ -545,7 +570,17 @@ where
         &beta,
         &worker,
     );
-
+    assert_eq!(cp.tau_g1[1], g1 * E::Fr::from(2));
+    assert_eq!(cp.alpha_mul_tau_g1[0], g1 * E::Fr::from(6));
+    assert_eq!(cp.alpha_mul_tau_g1[1], g1 * E::Fr::from(6 * 2));
+    assert_eq!(cp.beta_mul_tau_g1[0], g1 * E::Fr::from(24));
+    assert_eq!(cp.beta_mul_tau_g1[1], g1 * E::Fr::from(24 * 2));
+    //assert_eq!(ic[1] * gamma_inverse, g1 * E::Fr::from(0)); //?
+    /*for i in 0..200 {
+        println!("第{}个是吗", i);
+        assert_ne!(ic[1], (g1 * E::Fr::from(i)).to_affine());
+    }
+    assert_eq!(ic[1], (g1 * E::Fr::from(0)).to_affine());*/
     // Don't allow any elements be unconstrained, so that
     // the L query is always fully dense.
     for e in l.iter() {
@@ -553,6 +588,7 @@ where
             return Err(SynthesisError::UnconstrainedVariable);
         }
     }
+
     assert_eq!(h[0], ucp.h_g1[0].to_affine());
     assert_eq!(h[1], ucp.h_g1[1].to_affine());
     let g1 = g1.to_affine();
@@ -573,7 +609,6 @@ where
     assert_eq!(vk.gamma_g2, ucp.gamma_g2.to_affine());
     assert_eq!(vk.delta_g1, ucp.delta_g1.to_affine());
     assert_eq!(vk.delta_g2, ucp.delta_g2.to_affine());
-
     Ok(Parameters {
         vk,
         h: Arc::new(h),
